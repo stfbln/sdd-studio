@@ -2,7 +2,7 @@
   "name": "sdd-studio",
   "displayName": "SDD Studio",
   "description": "Specification-Driven Development: edit standard spec files (Gherkin, OpenAPI, AsyncAPI, gRPC/Protobuf, OpenCLI, markdown specs with RFC 2119 requirements, Open Threat Model, OpenSLO, Architecture Decision Records) and a Backstage software catalog linking them together through visual forms, while keeping plain files on disk, with an API and MCP server for AI assistants and other extensions.",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "publisher": "sdd",
   "repository": {
     "type": "git",
