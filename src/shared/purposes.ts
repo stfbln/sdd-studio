@@ -105,7 +105,7 @@ export const SPEC_PURPOSES: Record<PurposeKind, SpecPurpose> = {
       'Quality requirements: performance, availability, scalability, security and privacy rules, observability, operability.',
       'Compliance and regulatory constraints, business rules and design constraints that are neither an interface contract nor behaviour shown by an example.',
       'Background and rationale of those requirements, and the example scenarios that illustrate them.',
-      'General policies that several entities share, extended by the more specific specs (an "Extends:" line under the title).',
+      'General policies that several entities share, extended by the more specific specs (an "Extends:" line under the title naming one or several of them).',
     ],
     elsewhere: [
       'Owner, system, APIs, dependencies, networks and data: the catalog entry.',

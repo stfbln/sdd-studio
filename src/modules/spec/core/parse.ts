@@ -66,12 +66,20 @@ export interface Section {
   kind: 'context' | 'requirements' | 'other';
 }
 
-/** The "Extends: [Title](path)" line under the title: the spec this one inherits its requirements from. */
-export interface SpecExtends {
+/** One spec named on the "Extends:" line. */
+export interface SpecParent {
   /** Text of the link, e.g. "Data storage" (empty when the path is written on its own). */
   label: string;
   /** Path as written, relative to this file. */
   target: string;
+}
+
+/**
+ * The "Extends: [Data storage](./data-storage.spec.md), [Audit logging](./audit-logging.spec.md)"
+ * line under the title: the specs this one inherits its requirements from, closest first.
+ */
+export interface SpecExtends {
+  parents: SpecParent[];
   line: number;
 }
 
@@ -297,17 +305,40 @@ function findNotice(lines: string[], start: number, end: number, inFence: boolea
   return undefined;
 }
 
-/** The "Extends: ..." line, when it is the first thing written under the title. */
-export function parseExtendsLine(raw: string): { label: string; target: string } | undefined {
-  const value = EXTENDS.exec(raw)?.[1];
-  if (!value) return undefined;
-  const link = LINK.exec(value);
+/** Splits "[A](a.md), [B](b.md)" on the commas that separate the specs, not those inside a link. */
+function splitParents(value: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < value.length; i++) {
+    const char = value[i];
+    if (char === '[' || char === '(' || char === '<') depth++;
+    else if (char === ']' || char === ')' || char === '>') depth = Math.max(0, depth - 1);
+    else if (char === ',' && depth === 0) {
+      parts.push(value.slice(start, i));
+      start = i + 1;
+    }
+  }
+  parts.push(value.slice(start));
+  return parts.map((part) => part.trim()).filter(Boolean);
+}
+
+function parseParent(written: string): SpecParent | undefined {
+  const link = LINK.exec(written);
   if (link) {
     const target = (link[2] ?? link[3] ?? '').trim();
     return target ? { label: link[1].trim(), target } : undefined;
   }
-  const target = value.replace(/^[`<]+|[`>]+$/g, '').trim();
+  const target = written.replace(/^[`<]+|[`>]+$/g, '').trim();
   return target ? { label: '', target } : undefined;
+}
+
+/** The specs of an "Extends: ..." line, when it is the first thing written under the title. */
+export function parseExtendsLine(raw: string): SpecParent[] | undefined {
+  const value = EXTENDS.exec(raw)?.[1];
+  if (!value) return undefined;
+  const parents = splitParents(value).flatMap((written) => parseParent(written) ?? []);
+  return parents.length ? parents : undefined;
 }
 
 /** Skips HTML comments at the top of the body (update instructions, lint settings): they belong to no section. */
@@ -354,16 +385,16 @@ export function parseSpecMarkdown(text: string): SpecModel {
 
   const descriptionStart = title ? title.line + 1 : bodyStart;
   const descriptionEnd = boundaries.find((b) => b.line >= descriptionStart)?.line ?? lines.length;
-  // The spec extended is written first, above the description.
+  // The specs extended are written first, above the description.
   let first = descriptionStart;
   while (first < descriptionEnd && isBlank(lines[first])) first++;
-  const inheritance = first < descriptionEnd && !inFence[first] ? parseExtendsLine(lines[first]) : undefined;
-  const contentStart = inheritance ? first + 1 : descriptionStart;
+  const parents = first < descriptionEnd && !inFence[first] ? parseExtendsLine(lines[first]) : undefined;
+  const contentStart = parents ? first + 1 : descriptionStart;
   const model: SpecModel = {
     bodyStart,
     title,
     extraTitles: titles.slice(1),
-    ...(inheritance ? { extends: { ...inheritance, line: first } } : {}),
+    ...(parents ? { extends: { parents, line: first } } : {}),
     description: { text: blockText(lines, contentStart, descriptionEnd), start: contentStart, end: descriptionEnd },
     sections,
     lineCount: lines.length,

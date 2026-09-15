@@ -33,14 +33,33 @@ How to update this file (for people and AI assistants): a Markdown specification
 - Keep this comment.
 -->
 
-# Notifications
+# Audit logging
 
-Sends emails and push notifications when an order changes.
+The trail the shop keeps of who touched which data: the rules any store or
+service holding personal or financial data follows.
+
+## Context
+
+Asked for by the data protection officer, and by the payment provider for the
+yearly review. The trail is kept in its own store, apart from the data it
+describes.
+
+- Agreed with the security team on 2026-09-08.
 
 ## Requirements
 
 The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as described in BCP 14 [[RFC2119](https://www.rfc-editor.org/rfc/rfc2119)] [[RFC8174](https://www.rfc-editor.org/rfc/rfc8174)] when, and only when, they appear in all capitals, as shown here.
 
-### Platform
-
-- The service MUST expose prometheus metrics at `/metrics`
+- Every read and every change of personal or financial data MUST be written to
+  the audit trail with who, what, when and from where.
+  - Example: a support agent opens the address of order 4711; the trail keeps
+    the agent's account, the order, the time and the office IP range.
+- The audit trail MUST NOT hold the data that was read, only what was touched.
+- A component MUST NOT be able to change or delete an entry of the audit trail:
+  the store is append-only.
+- Entries MUST be kept for one year at least.
+- Reading the audit trail SHOULD be limited to the security team and to the
+  data protection officer.
+  - Example: a developer asking who read an address opens a request to the
+    security team instead of querying the trail.
+- A gap in the trail MUST raise an alert to the security team within an hour.

@@ -24,61 +24,87 @@ function TextLink({ heading, label }: { heading: Heading; label?: string }) {
   );
 }
 
-/** Value of the picker for a spec that is written in the file but not found in the workspace. */
-const UNKNOWN_PARENT = '?not-found';
-
-/** The more general spec this one extends: picked among the specs of the workspace folder. */
+/** The more general specs this one refines, listed on the "Extends:" line under the title. */
 function ExtendsField() {
   const { model, edit, context, openFile } = useSpec();
-  const written = model.extends?.target ?? '';
+  const parents = model.extends?.parents ?? [];
+  const written = parents.map((p) => p.target).join(', ');
   const [draft, setDraft] = useDraft(written, normalizeTitle);
   const specs = context?.specs ?? [];
-  const resolved = context ? parentPath(context.file, written) : undefined;
-  const known = specs.find((s) => s.path === resolved);
+  const listed = new Set(parents.flatMap((p) => (context ? (parentPath(context.file, p.target) ?? []) : [])));
+  const setParents = (next: { target: string; label?: string }[]) => edit({ op: 'setExtends', parents: next });
+  const add = (path: string) => {
+    const spec = specs.find((s) => s.path === path);
+    if (!spec || !context) return;
+    setParents([...parents, { target: relativePath(dirOf(context.file), spec.path), label: spec.title }]);
+  };
   return (
     <Field
       label="Extends"
       hint={
         <>
-          The more general spec this one refines, written as an “Extends: [Title](path)” line under the title. Its requirements apply here too: only write below what
-          is specific to this spec, or what overrides an inherited requirement.
+          The more general specs this one refines, written as an “Extends: [Title](path)” line under the title. Their requirements apply here too: only write below
+          what is specific to this spec, or what overrides an inherited requirement. When two of them disagree, the first one applies.
         </>
       }
     >
-      <span className="extends-field">
+      <div className="extends-field">
+        {parents.length > 0 && (
+          <ul className="extends-list">
+            {parents.map((parent, index) => {
+              const resolved = context ? parentPath(context.file, parent.target) : undefined;
+              const known = specs.find((s) => s.path === resolved);
+              return (
+                <li key={index} className="extends-row">
+                  <span className="codicon codicon-type-hierarchy-super" aria-hidden="true" />
+                  {known && resolved ? (
+                    <button type="button" className="link-button" title={resolved} onClick={() => openFile(resolved)}>
+                      {parent.label || known.title || parent.target}
+                    </button>
+                  ) : (
+                    <span title={parent.target}>{parent.label || parent.target}</span>
+                  )}
+                  {context && !known && <span className="op-label warning">not found</span>}
+                  <IconButton
+                    icon="close"
+                    label={`Stop extending ${parent.label || parent.target}`}
+                    onClick={() => setParents(parents.filter((_, i) => i !== index))}
+                  />
+                </li>
+              );
+            })}
+          </ul>
+        )}
         {context ? (
           <select
-            className="input"
-            aria-label="Spec extended"
-            value={known ? known.path : written ? UNKNOWN_PARENT : ''}
-            onChange={(e) => {
-              if (e.target.value === UNKNOWN_PARENT) return;
-              const spec = specs.find((s) => s.path === e.target.value);
-              edit({ op: 'setExtends', value: spec ? relativePath(dirOf(context.file), spec.path) : '', label: spec?.title });
-            }}
+            className="input extends-add"
+            aria-label="Extend another spec"
+            value=""
+            onChange={(e) => add(e.target.value)}
+            disabled={specs.every((spec) => listed.has(spec.path))}
           >
-            <option value="">Nothing: a spec of its own</option>
-            {written && !known && <option value={UNKNOWN_PARENT}>{written} (not found)</option>}
-            {specs.map((spec) => (
-              <option key={spec.path} value={spec.path}>
-                {spec.title ? `${spec.title} — ${spec.path}` : spec.path}
-              </option>
-            ))}
+            <option value="">{parents.length ? 'Extend another spec…' : 'Extend a spec…'}</option>
+            {specs
+              .filter((spec) => !listed.has(spec.path))
+              .map((spec) => (
+                <option key={spec.path} value={spec.path}>
+                  {spec.title ? `${spec.title} — ${spec.path}` : spec.path}
+                </option>
+              ))}
           </select>
         ) : (
           <input
             className="input"
-            aria-label="Spec extended"
-            placeholder="../generics/data-storage.spec.md"
+            aria-label="Specs extended"
+            placeholder="../generics/data-storage.spec.md, ../generics/audit-logging.spec.md"
             value={draft}
             onChange={(e) => {
               setDraft(e.target.value);
-              edit({ op: 'setExtends', value: e.target.value });
+              setParents(e.target.value.split(',').map((target) => ({ target })));
             }}
           />
         )}
-        {known && resolved && <IconButton icon="go-to-file" label="Open the spec extended" onClick={() => openFile(resolved)} />}
-      </span>
+      </div>
     </Field>
   );
 }
@@ -121,7 +147,7 @@ function OverviewSection() {
 function InheritedSection() {
   const { model, context, openFile } = useSpec();
   const chain = context?.inheritance.chain ?? [];
-  const problem = context?.inheritance.problem;
+  const problems = context?.inheritance.problems ?? [];
   if (!model.extends && !chain.length) return null;
   const own = new Map(allRequirements(model).map(({ item }) => [overrideKey(item.text), item]));
   const total = chain.reduce((count, spec) => count + spec.requirements.length, 0);
@@ -129,13 +155,14 @@ function InheritedSection() {
     <div id={anchorId('inherited')}>
       <Section title="Inherited requirements" icon="type-hierarchy" count={total}>
         <p className="muted small">
-          Apply to this spec as well, and are edited in the spec that states them. Restate one here only to override it with another key word.
+          Apply to this spec as well, and are edited in the spec that states them. Restate one here only to override it with another key word. Where two of these
+          specs disagree, the one listed first applies.
         </p>
-        {problem && (
-          <p className="notice small">
+        {problems.map((problem) => (
+          <p key={problem} className="notice small">
             <span className="codicon codicon-warning" aria-hidden="true" /> {problem}
           </p>
-        )}
+        ))}
         {chain.map((spec) => (
           <div key={spec.path} className="inherited-spec">
             <header className="inherited-header">
@@ -143,7 +170,7 @@ function InheritedSection() {
               <button type="button" className="link-button" title={spec.path} onClick={() => openFile(spec.path)}>
                 {spec.title || spec.path}
               </button>
-              <span className="op-label muted">{spec.depth === 1 ? 'extended by this spec' : `extended by ${chain[spec.depth - 2].title || chain[spec.depth - 2].path}`}</span>
+              <span className="op-label muted">{spec.via ? `extended by ${chain.find((s) => s.path === spec.via)?.title || spec.via}` : 'extended by this spec'}</span>
               <span className="count">{spec.requirements.length}</span>
             </header>
             {spec.requirements.length === 0 ? (

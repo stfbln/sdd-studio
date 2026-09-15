@@ -22,17 +22,20 @@ How to update this file (for people and AI assistants): a Markdown specification
   "Example: <one concrete case>" (e.g. "Example: a 20 EUR basket paid with a declined card leaves
   the order unpaid"). Give real values, one case per item, and no expected steps: behaviour shown
   step by step belongs in a Gherkin feature.
-- A spec can extend a more general spec: an "Extends: [Title](relative/path.spec.md)" line right
-  under the title, pointing to one other markdown spec (e.g. an ephemeral storage policy extending a
-  data storage policy). Its requirements and those of its own parents apply to this spec too.
+- A spec can extend one or several more general specs: an "Extends: [Title](relative/path.spec.md),
+  [Other](relative/other.spec.md)" line right under the title (e.g. an ephemeral storage policy
+  extending a data storage policy, a persistent storage policy extending it and an audit logging
+  policy). Their requirements, and those of the specs they extend, apply to this spec too.
 - Do not copy inherited requirements: only write here what is specific, or a requirement that
   overrides an inherited one by changing its key word (same sentence, e.g. SHOULD becoming MUST).
+  When two specs extended disagree, the one written first applies; restate the requirement here to
+  settle it.
 - Keep this comment.
 -->
 
 # Persistent storage
 
-Extends: [Data storage](./data-storage.spec.md)
+Extends: [Data storage](./data-storage.spec.md), [Audit logging](./audit-logging.spec.md)
 
 Stores the shop is expected to still hold the same data next year: orders,
 payments, invoices and customer accounts.

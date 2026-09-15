@@ -203,7 +203,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 | Part | Written as |
 | --- | --- |
 | Title | The first `#` heading |
-| Extends | An `Extends: [Title](path)` line right under the title (see [Specs that extend another spec](#specs-that-extend-another-spec)), removed when the picker is set back to "Nothing" |
+| Extends | An `Extends: [Title](path)` line right under the title, with the specs separated by commas (see [Specs that extend other specs](#specs-that-extend-other-specs)), removed when the last one goes |
 | Description | The text between the title (or the Extends line) and the first `##` section |
 | Context | A `## Context` section, removed when emptied |
 | Requirements | A `## Requirements` section: the BCP 14 conformance sentence of RFC 8174 (can be turned off), a list of requirements, and optional `###` groups (e.g. Security) with their own lists. A group is written as soon as it is named, even empty, and stays until it is deleted; the section goes when it has no requirement or group left |
@@ -227,17 +227,24 @@ A requirement can carry **example scenarios**: one concrete case each, with real
 
 Examples are edited in place (Shift+Enter for a second line), reordered and deleted like requirements, and an empty one is removed when you leave it. They illustrate a requirement, they do not replace a [Gherkin feature](#gherkin-module): behaviour shown step by step, with its Given / When / Then, belongs in a feature file, and a requirement can link to it.
 
-### Specs that extend another spec
+### Specs that extend other specs
 
-A spec can **extend** a more general one, so that shared rules are written once: a *Data storage* spec holds what every store follows, and an *Ephemeral storage* spec and a *Persistent storage* spec extend it and add what their own case needs. The link is an `Extends: [Title](relative/path.spec.md)` line right under the title, written by the **Extends** picker of the Overview section, which lists the other specs of the workspace folder.
+A spec can **extend** one or several more general ones, so that shared rules are written once: a *Data storage* spec holds what every store follows, an *Ephemeral storage* spec extends it, and a *Persistent storage* spec extends it together with an *Audit logging* spec. The link is an `Extends: [Title](path), [Other](other-path)` line right under the title, written by the **Extends** field of the Overview section, which lists the specs already extended and a picker for the other specs of the workspace folder.
 
-- The requirements of the whole chain (the spec extended, the spec *it* extends, and so on) are shown in an **Inherited requirements** section, read-only, grouped by the spec that states them, with their own examples and a link to open it. They are edited where they are written.
+```markdown
+# Persistent storage
+
+Extends: [Data storage](./data-storage.spec.md), [Audit logging](./audit-logging.spec.md)
+```
+
+- Every spec inherited from — the specs extended, in the order they are written, then the specs *those* extend, and so on — is shown in an **Inherited requirements** section, read-only, grouped by the spec that states them, with their own examples and a link to open it. They are edited where they are written. A spec reached through two different parents is listed once.
 - A requirement of the child that says the same thing as an inherited one with **another key word overrides it** (`Data SHOULD be encrypted at rest` becoming `Data MUST be encrypted at rest`): the inherited one is struck through and marked *overridden here*. Restating an inherited requirement without changing its key word is reported as a problem instead: it applies already.
-- A spec extends at most one other spec, so the specs form a tree. A missing file, a path outside the workspace folder and a circular chain are reported in the form.
+- When two specs extended **disagree** (the same requirement at two levels), the one listed first applies, and the form says so; restating the requirement in the child settles it.
+- A missing file, a path outside the workspace folder, a spec extending one that extends it back, and chains deeper than 10 specs are reported in the form.
 
 **Kept as written:** front matter, other `##` sections (listed with a link to their line in the text editor), notes or tables in the section or a group (they move and are deleted with their group), the list style (`-`, `*`, numbered) and task boxes (`- [x]`). Lines of the description or context that would start a `#`/`##` heading are escaped (`\##`), and a code block left open is closed, so typed text never breaks the structure.
 
-**Checks:** missing title, several level-1 headings, several Context or Requirements sections (only the first is edited), groups with the same name, empty requirements, requirements without a key word in capitals (with a hint when it is written in lowercase, which RFC 8174 excludes), the same requirement listed twice, empty or repeated examples, an Extends line that does not point to a markdown file, and, in the form, a broken chain of extended specs or a requirement that repeats an inherited one.
+**Checks:** missing title, several level-1 headings, several Context or Requirements sections (only the first is edited), groups with the same name, empty requirements, requirements without a key word in capitals (with a hint when it is written in lowercase, which RFC 8174 excludes), the same requirement listed twice, empty or repeated examples, an Extends line naming the same spec twice or pointing to something that is not a markdown file, and, in the form, specs extended that cannot be read, a requirement that repeats an inherited one and two specs extended that disagree.
 
 **SDD Specs: Open Specs Overview** lists the specs of the workspace (see [Spec catalogs](#spec-catalogs)), and **SDD Specs: New Spec (Markdown)** asks for the name of the system or component and creates `<slug>.spec.md` holding only its title.
 
@@ -245,7 +252,7 @@ Settings:
 
 - `sdd.spec.specsFolder` (default `specs/generics`): default folder for new specs in the Specs overview.
 
-Samples: `samples/specs/payment-service.spec.md` (all parts, examples under two requirements, a Security group with a note, another section), `samples/specs/notifications.spec.md` (title and description only) and a hierarchy of policies: `samples/specs/data-storage.spec.md` (the general one), extended by `samples/specs/ephemeral-storage.spec.md` and by `samples/specs/persistent-storage.spec.md`, which overrides its "Data SHOULD be encrypted at rest" with a MUST.
+Samples: `samples/specs/payment-service.spec.md` (all parts, examples under two requirements, a Security group with a note, another section), `samples/specs/notifications.spec.md` (title and description only) and a hierarchy of policies: `samples/specs/data-storage.spec.md` (the general one), extended by `samples/specs/ephemeral-storage.spec.md` and by `samples/specs/persistent-storage.spec.md`, which overrides its "Data SHOULD be encrypted at rest" with a MUST and also extends `samples/specs/audit-logging.spec.md`.
 
 ## Threat model module (Open Threat Model)
 
@@ -610,7 +617,7 @@ src/
       core/parse.ts             markdown → outline (title, Extends line, description, sections, requirements with their examples) with line ranges
       core/keywords.ts          RFC 2119 key words: detection, synonyms, changing the level, composing sentences
       core/edits.ts             line edits that add or remove sections, groups and examples as they get or lose content
-      core/inherit.ts           the chain of extended specs: inherited requirements, overrides, checks
+      core/inherit.ts           the specs extended: inherited requirements, overrides, disagreements, checks
       core/summary.ts           detection, checks, catalog row, template
       host/specKind.ts          markdown specs in the spec catalog
       host/context.ts           the specs of the workspace and the requirements the edited spec inherits

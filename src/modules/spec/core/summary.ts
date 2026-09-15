@@ -62,8 +62,11 @@ export function analyzeSpec(model: SpecModel): SpecIssue[] {
   const warn = (location: SpecLocation, message: string) => issues.push({ severity: 'warning', message, location });
 
   if (!model.title?.text) warn({ anchor: 'overview' }, 'The spec has no title (a "# Title" heading)');
-  const parent = model.extends?.target;
-  if (parent && !/\.(md|markdown)(#.*)?$/i.test(parent)) warn({ anchor: 'overview' }, `Extends "${parent}": a spec extends another markdown spec file`);
+  const parents = model.extends?.parents ?? [];
+  for (const [index, parent] of parents.entries()) {
+    if (!/\.(md|markdown)(#.*)?$/i.test(parent.target)) warn({ anchor: 'overview' }, `Extends "${parent.target}": a spec extends other markdown spec files`);
+    else if (parents.findIndex((p) => p.target === parent.target) !== index) warn({ anchor: 'overview' }, `Extends "${parent.target}" twice`);
+  }
   for (const heading of model.extraTitles) warn({ anchor: 'overview' }, `Line ${heading.line + 1}: "${heading.text}" is another level-1 heading; only the first one is the title`);
   for (const kind of ['context', 'requirements'] as const) {
     const [, ...others] = model.sections.filter((s) => s.kind === kind);
@@ -111,14 +114,14 @@ export function summarizeSpec(_fileName: string, text: string): SpecDetails {
   const total = allRequirements(model).length;
   const counts = keywordCounts(model).map((c) => `${c.count} ${c.keyword}`);
   const examples = exampleCount(model);
-  const parent = model.extends;
+  const parents = model.extends?.parents ?? [];
   return {
     name: model.title?.text ?? '',
     tags: [],
     details: [
       ...(total ? [plural(total, 'requirement'), ...(counts.length ? [counts.join(' · ')] : [])] : ['No requirements yet']),
       ...(examples ? [plural(examples, 'example')] : []),
-      ...(parent ? [`extends ${parent.label || parent.target}`] : []),
+      ...(parents.length ? [`extends ${parents.map((p) => p.label || p.target).join(', ')}`] : []),
     ],
     problems: analyzeSpec(model).length,
   };

@@ -137,53 +137,88 @@ describe('example scenarios', () => {
   });
 });
 
-describe('specs extending another spec', () => {
+describe('specs extending other specs', () => {
   const CHILD = '# Ephemeral storage\n\nExtends: [Data storage](../generics/data-storage.spec.md)\n\nCaches and scratch space.\n\n## Requirements\n\n- Data MUST be dropped after 24 hours.\n';
+  const parents = (text: string) => parseSpecMarkdown(text).extends?.parents;
 
   it('reads the Extends line under the title, apart from the description', () => {
     const model = parseSpecMarkdown(CHILD);
-    expect(model.extends).toEqual({ label: 'Data storage', target: '../generics/data-storage.spec.md', line: 2 });
+    expect(model.extends).toEqual({ parents: [{ label: 'Data storage', target: '../generics/data-storage.spec.md' }], line: 2 });
     expect(model.description.text).toBe('Caches and scratch space.');
-    expect(parseSpecMarkdown('# T\n\n**Extends:** <../a b.spec.md>\n').extends).toEqual({ label: '', target: '../a b.spec.md', line: 2 });
+    expect(parents('# T\n\n**Extends:** <../a b.spec.md>\n')).toEqual([{ label: '', target: '../a b.spec.md' }]);
+    // Several specs on the line: commas inside a link do not separate them.
+    expect(parents('# T\n\nExtends: [A, first](./a.spec.md), ./b.spec.md , [C](<./c d.spec.md>)\n')).toEqual([
+      { label: 'A, first', target: './a.spec.md' },
+      { label: '', target: './b.spec.md' },
+      { label: 'C', target: './c d.spec.md' },
+    ]);
     // Only the first thing written under the title, and only when it names a file.
-    expect(parseSpecMarkdown('# T\n\nA policy.\n\nExtends: [X](x.spec.md)\n').extends).toBeUndefined();
-    expect(parseSpecMarkdown('# T\n\nExtends the base policy.\n').extends).toBeUndefined();
+    expect(parents('# T\n\nA policy.\n\nExtends: [X](x.spec.md)\n')).toBeUndefined();
+    expect(parents('# T\n\nExtends the base policy.\n')).toBeUndefined();
     expect(parseSpecMarkdown(CHILD).sections.map((s) => s.kind)).toEqual(['requirements']);
   });
 
   it('writes, replaces and removes the Extends line, leaving the description alone', () => {
-    let text = edit('# Ephemeral storage\n\nCaches.\n', { op: 'setExtends', value: '../generics/data-storage.spec.md', label: 'Data storage' });
+    const storage = { target: '../generics/data-storage.spec.md', label: 'Data storage' };
+    let text = edit('# Ephemeral storage\n\nCaches.\n', { op: 'setExtends', parents: [storage] });
     expect(text).toBe('# Ephemeral storage\n\nExtends: [Data storage](../generics/data-storage.spec.md)\n\nCaches.\n');
     text = edit(text, { op: 'setDescription', value: 'Caches and scratch space.' });
     expect(text).toBe('# Ephemeral storage\n\nExtends: [Data storage](../generics/data-storage.spec.md)\n\nCaches and scratch space.\n');
-    expect(edit(text, { op: 'setExtends', value: './other.spec.md' })).toBe(text.replace('[Data storage](../generics/data-storage.spec.md)', '[other.spec.md](./other.spec.md)'));
-    expect(edit(text, { op: 'setExtends', value: '' })).toBe('# Ephemeral storage\n\nCaches and scratch space.\n');
+
+    // A second spec is added to the line, and a spec listed twice is written once.
+    const two = edit(text, { op: 'setExtends', parents: [storage, { target: './audit.spec.md', label: 'Audit logging' }, storage] });
+    expect(two).toContain('Extends: [Data storage](../generics/data-storage.spec.md), [Audit logging](./audit.spec.md)\n');
+    expect(parents(two)?.map((p) => p.target)).toEqual(['../generics/data-storage.spec.md', './audit.spec.md']);
+    expect(edit(two, { op: 'setExtends', parents: [{ target: './audit.spec.md', label: 'Audit logging' }] })).toBe(text.replace('[Data storage](../generics/data-storage.spec.md)', '[Audit logging](./audit.spec.md)'));
+
+    expect(edit(text, { op: 'setExtends', parents: [{ target: './other.spec.md' }] })).toBe(text.replace('[Data storage](../generics/data-storage.spec.md)', '[other.spec.md](./other.spec.md)'));
+    expect(edit(text, { op: 'setExtends', parents: [] })).toBe('# Ephemeral storage\n\nCaches and scratch space.\n');
+    expect(edit(text, { op: 'setExtends', parents: [{ target: '  ' }] })).toBe('# Ephemeral storage\n\nCaches and scratch space.\n');
     // Without a title, it stays above the description; a title added later goes on top.
-    const untitled = edit('Caches.\n', { op: 'setExtends', value: 'a.spec.md' });
+    const untitled = edit('Caches.\n', { op: 'setExtends', parents: [{ target: 'a.spec.md' }] });
     expect(untitled).toBe('Extends: [a.spec.md](a.spec.md)\n\nCaches.\n');
     expect(edit(untitled, { op: 'setTitle', value: 'Ephemeral' })).toBe('# Ephemeral\n\nExtends: [a.spec.md](a.spec.md)\n\nCaches.\n');
-    expect(edit('# T\n', { op: 'setExtends', value: '../a b.spec.md', label: 'A b' })).toBe('# T\n\nExtends: [A b](<../a b.spec.md>)\n');
+    expect(edit('# T\n', { op: 'setExtends', parents: [{ target: '../a b.spec.md', label: 'A b' }] })).toBe('# T\n\nExtends: [A b](<../a b.spec.md>)\n');
   });
 
-  it('resolves the parent, reads its requirements and reports what a child repeats', () => {
+  it('resolves the specs extended and reads their requirements', () => {
     expect(parentPath('specs/policies/ephemeral.spec.md', '../generics/data-storage.spec.md')).toBe('specs/generics/data-storage.spec.md');
     expect(parentPath('specs/a.spec.md', '../../outside.spec.md')).toBeUndefined();
     expect(parentPath('specs/a.spec.md', undefined)).toBeUndefined();
     expect(overrideKey('Data SHOULD be encrypted at rest.')).toBe(overrideKey('Data MUST be encrypted at rest'));
 
-    const parent = parseSpecMarkdown('# Data storage\n\n## Requirements\n\n- Data SHOULD be encrypted at rest.\n  - Example: a backup file is written with SSE-KMS.\n\n### Retention\n\n- Data MUST have a retention limit.\n');
-    expect(requirementsOf(parent)).toEqual([
+    const storage = parseSpecMarkdown('# Data storage\n\n## Requirements\n\n- Data SHOULD be encrypted at rest.\n  - Example: a backup file is written with SSE-KMS.\n\n### Retention\n\n- Data MUST have a retention limit.\n');
+    expect(requirementsOf(storage)).toEqual([
       { group: null, text: 'Data SHOULD be encrypted at rest.', keyword: 'SHOULD', examples: ['a backup file is written with SSE-KMS.'] },
       { group: 'Retention', text: 'Data MUST have a retention limit.', keyword: 'MUST', examples: [] },
     ]);
-
-    const inheritance: SpecInheritance = { chain: [{ path: 'specs/generics/data-storage.spec.md', title: 'Data storage', requirements: requirementsOf(parent), depth: 1 }] };
-    const child = parseSpecMarkdown('# Persistent storage\n\n## Requirements\n\n- Data MUST be encrypted at rest.\n- Data SHOULD have a retention limit.\n\n### Backups\n\n- Data MUST have a retention limit.\n');
-    // Raising the level of an inherited requirement is an override, restating it as it is is not.
-    expect(inheritanceIssues(child, inheritance).map((i) => [i.message, i.location.group])).toEqual([
-      ['Backups: requirement 1 repeats a requirement inherited from "Data storage"', 0],
+    expect(analyzeSpec(parseSpecMarkdown('# T\n\nExtends: [A](./a.spec.md), ./a.spec.md, [B](./b.txt)\n')).map((i) => i.message)).toEqual([
+      'Extends "./a.spec.md" twice',
+      'Extends "./b.txt": a spec extends other markdown spec files',
     ]);
-    expect(inheritanceIssues(child, { chain: [], problem: 'The spec it extends was not found: x.spec.md.' }).map((i) => i.message)).toEqual([
+    expect(summarizeSpec('x.spec.md', '# T\n\nExtends: [A](./a.spec.md), [B](./b.spec.md)\n').details).toContain('extends A, B');
+  });
+
+  it('reports repeated requirements and specs extended that disagree', () => {
+    const storage = parseSpecMarkdown('# Data storage\n\n## Requirements\n\n- Data SHOULD be encrypted at rest.\n\n### Retention\n\n- Data MUST have a retention limit.\n');
+    const audit = parseSpecMarkdown('# Audit logging\n\n## Requirements\n\n- Data MUST be encrypted at rest.\n- Every read MUST be logged.\n');
+    const inheritance: SpecInheritance = {
+      chain: [
+        { path: 'specs/generics/data-storage.spec.md', title: 'Data storage', requirements: requirementsOf(storage), depth: 1 },
+        { path: 'specs/generics/audit-logging.spec.md', title: 'Audit logging', requirements: requirementsOf(audit), depth: 1 },
+      ],
+      problems: [],
+    };
+    const child = parseSpecMarkdown('# Persistent storage\n\n## Requirements\n\n- Every read MUST be logged.\n\n### Backups\n\n- Data MUST have a retention limit.\n');
+    expect(inheritanceIssues(child, inheritance).map((i) => [i.message, i.location.anchor])).toEqual([
+      ['Requirement 1 repeats a requirement inherited from "Audit logging"', 'requirements'],
+      ['Backups: requirement 1 repeats a requirement inherited from "Data storage"', 'requirements'],
+      ['"Data storage" (SHOULD) and "Audit logging" (MUST) disagree on "Data SHOULD be encrypted at rest.": the first one applies, restate it here to settle it', 'inherited'],
+    ]);
+    // Settling it in the child, by overriding it, ends the disagreement.
+    const settled = parseSpecMarkdown('# Persistent storage\n\n## Requirements\n\n- Data MUST be encrypted at rest.\n');
+    expect(inheritanceIssues(settled, inheritance)).toEqual([]);
+    expect(inheritanceIssues(child, { chain: [], problems: ['The spec it extends was not found: x.spec.md.'] }).map((i) => i.message)).toEqual([
       'The spec it extends was not found: x.spec.md.',
     ]);
     expect(inheritanceIssues(child, undefined)).toEqual([]);

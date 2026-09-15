@@ -19,7 +19,9 @@ export function Nav({ current }: { current: SpecAnchor }) {
       {(model.extends || chain.length > 0) && (
         <NavItem active={current === 'inherited'} onClick={() => scrollToAnchor('inherited')} issues={issuesAt('inherited')}>
           <span className="codicon codicon-type-hierarchy" aria-hidden="true" />
-          <span className="path-label">{chain[0]?.title || chain[0]?.path || model.extends?.label || 'Inherited'}</span>
+          <span className="path-label" title={chain.map((spec) => spec.title || spec.path).join(', ')}>
+            {chain.length === 1 ? chain[0].title || chain[0].path : 'Inherited'}
+          </span>
           <span className="op-label muted">{chain.reduce((count, spec) => count + spec.requirements.length, 0)}</span>
         </NavItem>
       )}

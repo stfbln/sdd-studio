@@ -21,8 +21,8 @@ import {
 export type SpecEdit =
   /** An empty value removes the title. */
   | { op: 'setTitle'; value: string }
-  /** The spec this one inherits its requirements from: a path relative to this file, empty to remove the line. */
-  | { op: 'setExtends'; value: string; label?: string }
+  /** The specs this one inherits its requirements from, closest first; paths relative to this file, an empty list removes the line. */
+  | { op: 'setExtends'; parents: { target: string; label?: string }[] }
   | { op: 'setDescription'; value: string }
   | { op: 'setContext'; value: string }
   /** The BCP 14 sentence at the start of the Requirements section. */
@@ -174,18 +174,24 @@ function setTitle(doc: Lines, value: string) {
   }
 }
 
-/** "Extends: [Title](path)" right under the title; an empty path removes the line. */
-function setExtends(doc: Lines, value: string, label?: string) {
+/** "[Data storage](./data-storage.spec.md)": the label falls back to the file name, spaces need angle brackets. */
+function renderParent({ target, label }: { target: string; label?: string }): string {
+  const text = normalizeTitle(label ?? '').replace(/[[\]]/g, '') || baseName(target);
+  return `[${text}](${/[()\s]/.test(target) ? `<${target}>` : target})`;
+}
+
+/** "Extends: [A](a.spec.md), [B](b.spec.md)" right under the title; an empty list removes the line. */
+function setExtends(doc: Lines, parents: { target: string; label?: string }[]) {
   const model = doc.model;
-  const target = normalizeTitle(value);
   const current = model.extends;
-  if (!target) {
+  const written = parents.map((parent) => ({ ...parent, target: normalizeTitle(parent.target) })).filter((parent) => parent.target);
+  // The same spec listed twice would apply twice: keep the first mention.
+  const unique = written.filter((parent, index) => written.findIndex((p) => p.target === parent.target) === index);
+  if (!unique.length) {
     if (current) doc.removeBlock(current.line, current.line + 1);
     return;
   }
-  const text = normalizeTitle(label ?? '').replace(/[[\]]/g, '') || baseName(target);
-  const destination = /[()\s]/.test(target) ? `<${target}>` : target;
-  const line = `Extends: [${text}](${destination})`;
+  const line = `Extends: ${unique.map(renderParent).join(', ')}`;
   if (current) {
     if (doc.lines[current.line] !== line) doc.replace(current.line, current.line + 1, [line]);
   } else {
@@ -295,7 +301,7 @@ function applyOne(doc: Lines, edit: SpecEdit) {
     case 'setTitle':
       return setTitle(doc, edit.value);
     case 'setExtends':
-      return setExtends(doc, edit.value, edit.label);
+      return setExtends(doc, edit.parents);
     case 'setDescription':
       return doc.setBlock(model.description.start, model.description.end, normalizeBlock(edit.value), model.extends ? model.extends.line + 1 : model.title ? model.title.line + 1 : model.bodyStart);
     case 'setContext':
