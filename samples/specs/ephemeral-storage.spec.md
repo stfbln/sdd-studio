@@ -30,14 +30,34 @@ How to update this file (for people and AI assistants): a Markdown specification
 - Keep this comment.
 -->
 
-# Notifications
+# Ephemeral storage
 
-Sends emails and push notifications when an order changes.
+Extends: [Data storage](./data-storage.spec.md)
+
+Caches, queues and scratch space: stores the shop can lose without losing
+anything a customer or an accountant would miss.
+
+## Context
+
+The checkout cache, the session store and the working files of the import jobs.
+Losing them costs latency and work, not data: whatever they hold can be rebuilt
+from a persistent store.
 
 ## Requirements
 
 The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as described in BCP 14 [[RFC2119](https://www.rfc-editor.org/rfc/rfc2119)] [[RFC8174](https://www.rfc-editor.org/rfc/rfc8174)] when, and only when, they appear in all capitals, as shown here.
 
-### Platform
-
-- The service MUST expose prometheus metrics at `/metrics`
+- Every item MUST be written with a time to live of seven days at most.
+  - Example: a basket is cached for two hours; once the customer comes back a
+    day later, the checkout reads the basket from the orders database again.
+- A component MUST keep working, slower, when the store answers that it holds
+  nothing.
+  - Example: the checkout cache is emptied during a failover; the next requests
+    are served from the orders database and only latency changes.
+- An ephemeral store MUST NOT be the only place holding data an invoice, a
+  shipment or an audit depends on.
+- An ephemeral store MUST NOT be backed up.
+- Personal data SHOULD NOT be written to an ephemeral store; when it is, the
+  time to live MUST be one day at most.
+  - Example: a delivery address kept in the checkout cache is dropped after
+    four hours.

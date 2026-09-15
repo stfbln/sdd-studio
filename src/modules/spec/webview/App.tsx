@@ -3,6 +3,7 @@ import { ReworkButton } from '../../../webview/components/ReworkButton';
 import { EditorFrame } from '../../../webview/structured/EditorFrame';
 import { useStructuredDocument, type LocalEngine } from '../../../webview/structured/useStructuredDocument';
 import { applySpecEdits, type SpecEdit } from '../core/edits';
+import { inheritanceIssues, type SpecEditorContext } from '../core/inherit';
 import { parseSpecFile, type SpecFile } from '../core/parse';
 import { allRequirements, analyzeSpec, plural, type SpecAnchor } from '../core/summary';
 import { Nav } from './Nav';
@@ -20,13 +21,15 @@ const engine: LocalEngine<SpecFile, SpecEdit> = {
         return edit.op;
       case 'setRequirement':
         return `${edit.op} ${edit.group} ${edit.index}`;
+      case 'setExample':
+        return `${edit.op} ${edit.group} ${edit.index} ${edit.example}`;
       default:
         return undefined;
     }
   },
 };
 
-const ANCHORS: SpecAnchor[] = ['overview', 'context', 'requirements'];
+const ANCHORS: SpecAnchor[] = ['overview', 'inherited', 'context', 'requirements'];
 
 /** The part of the page at the top of the scrolled pane. */
 function useVisibleAnchor(ready: boolean) {
@@ -52,12 +55,21 @@ function useVisibleAnchor(ready: boolean) {
 export function App() {
   const doc = useStructuredDocument<null, SpecFile, SpecEdit>(null, engine);
   const { spec, actions } = doc;
-  const issues = useMemo(() => (spec ? analyzeSpec(spec.model) : []), [spec]);
+  const hostContext = doc.hostContext as SpecEditorContext | undefined;
+  const issues = useMemo(() => (spec ? [...analyzeSpec(spec.model), ...inheritanceIssues(spec.model, hostContext?.inheritance)] : []), [spec, hostContext]);
   const visible = useVisibleAnchor(!!spec);
 
   if (!spec) return <div className="loading">Loading spec…</div>;
 
-  const context: SpecEditorValue = { doc: spec, model: spec.model, issues, edit: actions.edit, openAsText: actions.openAsText };
+  const context: SpecEditorValue = {
+    doc: spec,
+    model: spec.model,
+    issues,
+    context: hostContext,
+    edit: actions.edit,
+    openAsText: actions.openAsText,
+    openFile: actions.openFile,
+  };
   return (
     <SpecContext.Provider value={context}>
       <EditorFrame

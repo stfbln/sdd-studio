@@ -3,13 +3,14 @@ import { normalizeTitle, type ListRef } from './edits';
 import { KEYWORDS, lowercaseKeyword, subjectOf, type Keyword } from './keywords';
 import { parseSpecMarkdown, type Requirement, type SpecModel } from './parse';
 
-export type SpecAnchor = 'overview' | 'context' | 'requirements';
+export type SpecAnchor = 'overview' | 'inherited' | 'context' | 'requirements';
 
-/** Where a problem is shown in the form: a part of the page, or one requirement. */
+/** Where a problem is shown in the form: a part of the page, one requirement, or one of its examples. */
 export interface SpecLocation {
   anchor: SpecAnchor;
   group?: ListRef;
   index?: number;
+  example?: number;
 }
 
 export interface SpecIssue {
@@ -31,6 +32,8 @@ export function allRequirements(model: SpecModel): { group: ListRef; index: numb
     ...requirements.groups.flatMap((g, group) => g.items.map((item, index) => ({ group, index, item }))),
   ];
 }
+
+export const exampleCount = (model: SpecModel) => allRequirements(model).reduce((total, r) => total + r.item.examples.length, 0);
 
 export function keywordCounts(model: SpecModel): { keyword: Keyword; count: number }[] {
   const all = allRequirements(model);
@@ -59,6 +62,8 @@ export function analyzeSpec(model: SpecModel): SpecIssue[] {
   const warn = (location: SpecLocation, message: string) => issues.push({ severity: 'warning', message, location });
 
   if (!model.title?.text) warn({ anchor: 'overview' }, 'The spec has no title (a "# Title" heading)');
+  const parent = model.extends?.target;
+  if (parent && !/\.(md|markdown)(#.*)?$/i.test(parent)) warn({ anchor: 'overview' }, `Extends "${parent}": a spec extends another markdown spec file`);
   for (const heading of model.extraTitles) warn({ anchor: 'overview' }, `Line ${heading.line + 1}: "${heading.text}" is another level-1 heading; only the first one is the title`);
   for (const kind of ['context', 'requirements'] as const) {
     const [, ...others] = model.sections.filter((s) => s.kind === kind);
@@ -89,6 +94,14 @@ export function analyzeSpec(model: SpecModel): SpecIssue[] {
     }
     if (seen.has(key)) warn(location, `${Label} is listed twice`);
     seen.add(key);
+
+    const examples = new Set<string>();
+    for (const [example, { text }] of item.examples.entries()) {
+      const value = normalizeTitle(text).toLowerCase();
+      if (!value) warn({ ...location, example }, `${Label}: example ${example + 1} is empty`);
+      else if (examples.has(value)) warn({ ...location, example }, `${Label}: example ${example + 1} is listed twice`);
+      examples.add(value);
+    }
   }
   return issues;
 }
@@ -97,10 +110,16 @@ export function summarizeSpec(_fileName: string, text: string): SpecDetails {
   const model = parseSpecMarkdown(text);
   const total = allRequirements(model).length;
   const counts = keywordCounts(model).map((c) => `${c.count} ${c.keyword}`);
+  const examples = exampleCount(model);
+  const parent = model.extends;
   return {
     name: model.title?.text ?? '',
     tags: [],
-    details: total ? [plural(total, 'requirement'), ...(counts.length ? [counts.join(' · ')] : [])] : ['No requirements yet'],
+    details: [
+      ...(total ? [plural(total, 'requirement'), ...(counts.length ? [counts.join(' · ')] : [])] : ['No requirements yet']),
+      ...(examples ? [plural(examples, 'example')] : []),
+      ...(parent ? [`extends ${parent.label || parent.target}`] : []),
+    ],
     problems: analyzeSpec(model).length,
   };
 }

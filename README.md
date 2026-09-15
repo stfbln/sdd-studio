@@ -178,6 +178,8 @@ The form always shows every part, but the file only contains the parts that are 
 ```markdown
 # Payment service
 
+Extends: [Data storage](./data-storage.spec.md)
+
 Takes card and wallet payments for the web shop.
 
 ## Context
@@ -189,6 +191,8 @@ Called by the order service once the customer confirms the basket.
 The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as described in BCP 14 [[RFC2119](https://www.rfc-editor.org/rfc/rfc2119)] [[RFC8174](https://www.rfc-editor.org/rfc/rfc8174)] when, and only when, they appear in all capitals, as shown here.
 
 - The service MUST take card payments through the payment provider's hosted form.
+  - Example: a customer pays a 20 EUR basket with a Visa card and comes back to the shop with the order marked paid.
+  - Example: the provider declines the card; the order stays unpaid.
 - The service SHOULD support Apple Pay and Google Pay.
 
 ### Security
@@ -199,20 +203,41 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 | Part | Written as |
 | --- | --- |
 | Title | The first `#` heading |
-| Description | The text between the title and the first `##` section |
+| Extends | An `Extends: [Title](path)` line right under the title (see [Specs that extend another spec](#specs-that-extend-another-spec)), removed when the picker is set back to "Nothing" |
+| Description | The text between the title (or the Extends line) and the first `##` section |
 | Context | A `## Context` section, removed when emptied |
 | Requirements | A `## Requirements` section: the BCP 14 conformance sentence of RFC 8174 (can be turned off), a list of requirements, and optional `###` groups (e.g. Security) with their own lists. A group is written as soon as it is named, even empty, and stays until it is deleted; the section goes when it has no requirement or group left |
+| Examples | A nested list under a requirement, each item written `- Example: <one concrete case>` |
 
 **Requirements** are sentences with a key word in capitals: **MUST** / **MUST NOT** (absolute), **SHOULD** / **SHOULD NOT** (recommended, exceptions need a valid reason), **MAY** (optional). The other RFC 2119 words are read as their equivalent (SHALL and REQUIRED as MUST, SHALL NOT as MUST NOT, RECOMMENDED as SHOULD, NOT RECOMMENDED as SHOULD NOT, OPTIONAL as MAY) and kept as written.
 
 - Each row has a **key word picker** next to the sentence: picking a level replaces the key word in the sentence (or a lowercase "must", "should"...). The picker follows what you type.
 - The **add box** takes a full sentence as typed, or composes one: with MUST selected, `Take card payments` becomes `The service MUST take card payments`, reusing the subject of the last requirement (or the title). A preview shows the sentence before it is added.
 - Requirements can be edited in place (Shift+Enter for a second line), reordered, moved to another group, and deleted. Deleting the text of a requirement and leaving it removes it. Groups can be added (empty, then filled by adding requirements or moving existing ones into them), renamed, reordered and deleted with their content.
-- The Requirements header counts requirements per key word; the outline on the left shows the groups.
+- The Requirements header counts requirements per key word and their examples; the outline on the left shows the groups.
+
+### Example scenarios
+
+A requirement can carry **example scenarios**: one concrete case each, with real values, showing what the requirement means. The beaker button of a requirement opens its examples; they are written as a nested list under it and move, are copied to another group and are deleted with it.
+
+```markdown
+- The service MUST record every payment attempt with its order, amount, currency and outcome.
+  - Example: three attempts on the same order, two declined and one accepted, are all readable in the back office.
+```
+
+Examples are edited in place (Shift+Enter for a second line), reordered and deleted like requirements, and an empty one is removed when you leave it. They illustrate a requirement, they do not replace a [Gherkin feature](#gherkin-module): behaviour shown step by step, with its Given / When / Then, belongs in a feature file, and a requirement can link to it.
+
+### Specs that extend another spec
+
+A spec can **extend** a more general one, so that shared rules are written once: a *Data storage* spec holds what every store follows, and an *Ephemeral storage* spec and a *Persistent storage* spec extend it and add what their own case needs. The link is an `Extends: [Title](relative/path.spec.md)` line right under the title, written by the **Extends** picker of the Overview section, which lists the other specs of the workspace folder.
+
+- The requirements of the whole chain (the spec extended, the spec *it* extends, and so on) are shown in an **Inherited requirements** section, read-only, grouped by the spec that states them, with their own examples and a link to open it. They are edited where they are written.
+- A requirement of the child that says the same thing as an inherited one with **another key word overrides it** (`Data SHOULD be encrypted at rest` becoming `Data MUST be encrypted at rest`): the inherited one is struck through and marked *overridden here*. Restating an inherited requirement without changing its key word is reported as a problem instead: it applies already.
+- A spec extends at most one other spec, so the specs form a tree. A missing file, a path outside the workspace folder and a circular chain are reported in the form.
 
 **Kept as written:** front matter, other `##` sections (listed with a link to their line in the text editor), notes or tables in the section or a group (they move and are deleted with their group), the list style (`-`, `*`, numbered) and task boxes (`- [x]`). Lines of the description or context that would start a `#`/`##` heading are escaped (`\##`), and a code block left open is closed, so typed text never breaks the structure.
 
-**Checks:** missing title, several level-1 headings, several Context or Requirements sections (only the first is edited), groups with the same name, empty requirements, requirements without a key word in capitals (with a hint when it is written in lowercase, which RFC 8174 excludes), the same requirement listed twice.
+**Checks:** missing title, several level-1 headings, several Context or Requirements sections (only the first is edited), groups with the same name, empty requirements, requirements without a key word in capitals (with a hint when it is written in lowercase, which RFC 8174 excludes), the same requirement listed twice, empty or repeated examples, an Extends line that does not point to a markdown file, and, in the form, a broken chain of extended specs or a requirement that repeats an inherited one.
 
 **SDD Specs: Open Specs Overview** lists the specs of the workspace (see [Spec catalogs](#spec-catalogs)), and **SDD Specs: New Spec (Markdown)** asks for the name of the system or component and creates `<slug>.spec.md` holding only its title.
 
@@ -220,7 +245,7 @@ Settings:
 
 - `sdd.spec.specsFolder` (default `specs/generics`): default folder for new specs in the Specs overview.
 
-Samples: `samples/specs/payment-service.spec.md` (all parts, a Security group with a note, another section) and `samples/specs/notifications.spec.md` (title and description only).
+Samples: `samples/specs/payment-service.spec.md` (all parts, examples under two requirements, a Security group with a note, another section), `samples/specs/notifications.spec.md` (title and description only) and a hierarchy of policies: `samples/specs/data-storage.spec.md` (the general one), extended by `samples/specs/ephemeral-storage.spec.md` and by `samples/specs/persistent-storage.spec.md`, which overrides its "Data SHOULD be encrypted at rest" with a MUST.
 
 ## Threat model module (Open Threat Model)
 
@@ -416,7 +441,7 @@ Spec files can say at their top how to update them, so that an AI assistant (or 
 | Gherkin features | Comment lines: link to the Gherkin reference and how to write steps, outlines and tags (below `# language:` when there is one) |
 | Protocol Buffers | `//` comment lines: link to the language guide, style guide, field numbering and imports |
 | OpenSLO | Comment lines linking to the OpenSLO reference (it has no published JSON schema, so no modeline): kinds, how objects reference each other by name, and the fields an SLO and an SLI require |
-| Markdown specs | An HTML comment (invisible once rendered): sections, one RFC 2119 key word per requirement, groups |
+| Markdown specs | An HTML comment (invisible once rendered): sections, one RFC 2119 key word per requirement, groups, example scenarios, the Extends line and what not to copy from the spec extended |
 | JSON files | JSON has no comments, so only the schema link: `"$schema"` (OpenCLI, threat models) or `"x-json-schema"` (OpenAPI and AsyncAPI, which only allow `x-` extensions) |
 
 Sample header of an OpenAPI file:
@@ -582,11 +607,13 @@ src/
       webview/                  React UI: command tree, general and command pages
     spec/
       index.ts                  module entry: form editor with the markdown engine, spec detection, commands
-      core/parse.ts             markdown → outline (title, description, sections, requirement lists and groups) with line ranges
+      core/parse.ts             markdown → outline (title, Extends line, description, sections, requirements with their examples) with line ranges
       core/keywords.ts          RFC 2119 key words: detection, synonyms, changing the level, composing sentences
-      core/edits.ts             line edits that add or remove sections and groups as they get or lose content
+      core/edits.ts             line edits that add or remove sections, groups and examples as they get or lose content
+      core/inherit.ts           the chain of extended specs: inherited requirements, overrides, checks
       core/summary.ts           detection, checks, catalog row, template
       host/specKind.ts          markdown specs in the spec catalog
+      host/context.ts           the specs of the workspace and the requirements the edited spec inherits
       webview/                  React UI: outline and the single spec page
     otm/
       index.ts                  module entry: form editor, threat model detection, commands

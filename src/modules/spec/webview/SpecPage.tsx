@@ -1,14 +1,16 @@
 import { useRef, useState } from 'react';
+import { dirOf, relativePath } from '../../../shared/files';
 import { AutoTextarea } from '../../../webview/components/AutoTextarea';
 import { IconButton } from '../../../webview/components/IconButton';
 import { requestFocus } from '../../../webview/focus';
 import { ProblemsList } from '../../../webview/structured/EditorFrame';
 import { Field, KeyInput, Section } from '../../../webview/structured/fields';
-import { listOf, normalizeBlock, normalizeRequirement, normalizeTitle, type ListRef } from '../core/edits';
+import { listOf, normalizeBlock, normalizeExample, normalizeRequirement, normalizeTitle, type ListRef } from '../core/edits';
+import { overrideKey, parentPath } from '../core/inherit';
 import { composeRequirement, CONFORMANCE_NOTICE, findKeyword, KEYWORD_MEANINGS, KEYWORDS, withKeyword, type Keyword } from '../core/keywords';
-import type { Heading, Requirement } from '../core/parse';
-import { allRequirements, defaultSubject, keywordCounts, plural } from '../core/summary';
-import { anchorId, goTo, groupId, listKey, useDraft, useSpec } from './state';
+import type { Example, Heading, Requirement } from '../core/parse';
+import { allRequirements, defaultSubject, exampleCount, keywordCounts, plural } from '../core/summary';
+import { anchorId, exampleKey, goTo, groupId, listKey, useDraft, useSpec } from './state';
 
 export const keywordClass = (keyword: string | undefined) => (keyword ? `kw kw-${keyword.toLowerCase().replace(' ', '-')}` : 'kw kw-none');
 
@@ -19,6 +21,65 @@ function TextLink({ heading, label }: { heading: Heading; label?: string }) {
     <button type="button" className="link-button" title={`Line ${heading.line + 1}`} onClick={() => openAsText(heading.line + 1)}>
       {label ?? `${'#'.repeat(heading.level)} ${heading.text}`}
     </button>
+  );
+}
+
+/** Value of the picker for a spec that is written in the file but not found in the workspace. */
+const UNKNOWN_PARENT = '?not-found';
+
+/** The more general spec this one extends: picked among the specs of the workspace folder. */
+function ExtendsField() {
+  const { model, edit, context, openFile } = useSpec();
+  const written = model.extends?.target ?? '';
+  const [draft, setDraft] = useDraft(written, normalizeTitle);
+  const specs = context?.specs ?? [];
+  const resolved = context ? parentPath(context.file, written) : undefined;
+  const known = specs.find((s) => s.path === resolved);
+  return (
+    <Field
+      label="Extends"
+      hint={
+        <>
+          The more general spec this one refines, written as an “Extends: [Title](path)” line under the title. Its requirements apply here too: only write below what
+          is specific to this spec, or what overrides an inherited requirement.
+        </>
+      }
+    >
+      <span className="extends-field">
+        {context ? (
+          <select
+            className="input"
+            aria-label="Spec extended"
+            value={known ? known.path : written ? UNKNOWN_PARENT : ''}
+            onChange={(e) => {
+              if (e.target.value === UNKNOWN_PARENT) return;
+              const spec = specs.find((s) => s.path === e.target.value);
+              edit({ op: 'setExtends', value: spec ? relativePath(dirOf(context.file), spec.path) : '', label: spec?.title });
+            }}
+          >
+            <option value="">Nothing: a spec of its own</option>
+            {written && !known && <option value={UNKNOWN_PARENT}>{written} (not found)</option>}
+            {specs.map((spec) => (
+              <option key={spec.path} value={spec.path}>
+                {spec.title ? `${spec.title} — ${spec.path}` : spec.path}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input
+            className="input"
+            aria-label="Spec extended"
+            placeholder="../generics/data-storage.spec.md"
+            value={draft}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              edit({ op: 'setExtends', value: e.target.value });
+            }}
+          />
+        )}
+        {known && resolved && <IconButton icon="go-to-file" label="Open the spec extended" onClick={() => openFile(resolved)} />}
+      </span>
+    </Field>
   );
 }
 
@@ -50,6 +111,74 @@ function OverviewSection() {
             }}
           />
         </Field>
+        <ExtendsField />
+      </Section>
+    </div>
+  );
+}
+
+/** Requirements of the specs this one extends: read-only, with the ones it overrides marked. */
+function InheritedSection() {
+  const { model, context, openFile } = useSpec();
+  const chain = context?.inheritance.chain ?? [];
+  const problem = context?.inheritance.problem;
+  if (!model.extends && !chain.length) return null;
+  const own = new Map(allRequirements(model).map(({ item }) => [overrideKey(item.text), item]));
+  const total = chain.reduce((count, spec) => count + spec.requirements.length, 0);
+  return (
+    <div id={anchorId('inherited')}>
+      <Section title="Inherited requirements" icon="type-hierarchy" count={total}>
+        <p className="muted small">
+          Apply to this spec as well, and are edited in the spec that states them. Restate one here only to override it with another key word.
+        </p>
+        {problem && (
+          <p className="notice small">
+            <span className="codicon codicon-warning" aria-hidden="true" /> {problem}
+          </p>
+        )}
+        {chain.map((spec) => (
+          <div key={spec.path} className="inherited-spec">
+            <header className="inherited-header">
+              <span className="codicon codicon-book" aria-hidden="true" />
+              <button type="button" className="link-button" title={spec.path} onClick={() => openFile(spec.path)}>
+                {spec.title || spec.path}
+              </button>
+              <span className="op-label muted">{spec.depth === 1 ? 'extended by this spec' : `extended by ${chain[spec.depth - 2].title || chain[spec.depth - 2].path}`}</span>
+              <span className="count">{spec.requirements.length}</span>
+            </header>
+            {spec.requirements.length === 0 ? (
+              <p className="muted small">No requirements.</p>
+            ) : (
+              <ol className="requirement-list inherited-list">
+                {spec.requirements.map((requirement, index) => {
+                  const override = own.get(overrideKey(requirement.text));
+                  return (
+                    <li key={index} className="inherited-row">
+                      <span className={`kind-badge ${keywordClass(requirement.keyword)}`} title={requirement.keyword ? KEYWORD_MEANINGS[requirement.keyword] : 'No RFC 2119 key word in capitals'}>
+                        {requirement.keyword ?? '—'}
+                      </span>
+                      <div className="inherited-text">
+                        <span className={override ? 'overridden' : ''}>{requirement.text}</span>
+                        {requirement.group && <span className="op-label muted">{requirement.group}</span>}
+                        {override && <span className="op-label">overridden here: {override.keyword ?? 'no key word'}</span>}
+                        {requirement.examples.length > 0 && (
+                          <ul className="example-list">
+                            {requirement.examples.map((example, position) => (
+                              <li key={position} className="example-row read-only">
+                                <span className="example-label">Example</span>
+                                <span>{example}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
+          </div>
+        ))}
       </Section>
     </div>
   );
@@ -99,9 +228,92 @@ function KeywordSelect({ written, onChange, label, disabled }: { written?: strin
   );
 }
 
+/** One example scenario of a requirement: an empty one is removed when it is left. */
+function ExampleRow({ group, index, example, position, count }: { group: ListRef; index: number; example: Example; position: number; count: number }) {
+  const { edit } = useSpec();
+  const [draft, setDraft] = useDraft(example.text, normalizeExample);
+  const row = useRef<HTMLLIElement>(null);
+  const remove = () => edit({ op: 'deleteExample', group, index, example: position });
+  return (
+    <li className="example-row" ref={row}>
+      <span className="example-label" aria-hidden="true">
+        Example
+      </span>
+      <AutoTextarea
+        value={draft}
+        aria-label={`Example ${position + 1} of requirement ${index + 1}`}
+        data-focus-key={exampleKey(group, index, position)}
+        placeholder="Empty example: removed when you leave it"
+        onChange={(text) => {
+          setDraft(text);
+          edit({ op: 'setExample', group, index, example: position, text });
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey && !e.altKey) {
+            e.preventDefault();
+            requestFocus(exampleKey(group, index));
+          } else if (e.key === 'Backspace' && !draft) {
+            e.preventDefault();
+            remove();
+            requestFocus(position > 0 ? exampleKey(group, index, position - 1) : exampleKey(group, index));
+          }
+        }}
+        onBlur={(e) => {
+          if (!normalizeExample(draft) && !row.current?.contains(e.relatedTarget as Node | null)) remove();
+        }}
+      />
+      <span className="row-actions">
+        <IconButton icon="arrow-up" label="Move example up" disabled={position === 0} onClick={() => edit({ op: 'moveExample', group, index, example: position, to: position - 1 })} />
+        <IconButton icon="arrow-down" label="Move example down" disabled={position === count - 1} onClick={() => edit({ op: 'moveExample', group, index, example: position, to: position + 1 })} />
+        <IconButton icon="trash" label="Delete example" onClick={remove} />
+      </span>
+    </li>
+  );
+}
+
+/** Example scenarios of one requirement, written as a nested "- Example: ..." list under it. */
+function ExampleList({ group, index, examples }: { group: ListRef; index: number; examples: Example[] }) {
+  const { edit } = useSpec();
+  const [typed, setTyped] = useState('');
+  const add = () => {
+    const text = normalizeExample(typed);
+    if (!text) return;
+    edit({ op: 'addExample', group, index, text });
+    setTyped('');
+  };
+  return (
+    <div className="requirement-examples">
+      <ul className="example-list">
+        {examples.map((example, position) => (
+          <ExampleRow key={position} group={group} index={index} example={example} position={position} count={examples.length} />
+        ))}
+        <li className="example-row example-add">
+          <span className="example-label" aria-hidden="true">
+            Example
+          </span>
+          <input
+            className="input"
+            data-focus-key={exampleKey(group, index)}
+            aria-label={`New example of requirement ${index + 1}`}
+            placeholder="One concrete case, with real values, e.g. “a 20 EUR basket paid with a declined card leaves the order unpaid”"
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') add();
+              if (e.key === 'Escape') setTyped('');
+            }}
+          />
+          <IconButton icon="add" label="Add example" disabled={!normalizeExample(typed)} onClick={add} />
+        </li>
+      </ul>
+    </div>
+  );
+}
+
 function RequirementRow({ group, item, index, count }: { group: ListRef; item: Requirement; index: number; count: number }) {
   const { model, edit } = useSpec();
   const [draft, setDraft] = useDraft(item.text, normalizeRequirement);
+  const [showExamples, setShowExamples] = useState(false);
   const row = useRef<HTMLLIElement>(null);
   const key = listKey(group);
   const groups = model.requirements?.groups ?? [];
@@ -155,10 +367,19 @@ function RequirementRow({ group, item, index, count }: { group: ListRef; item: R
             ))}
           </select>
         )}
+        <IconButton
+          icon="beaker"
+          label={item.examples.length ? `Examples (${item.examples.length})` : 'Add an example scenario'}
+          onClick={() => {
+            setShowExamples(true);
+            requestFocus(exampleKey(group, index));
+          }}
+        />
         <IconButton icon="arrow-up" label="Move up" disabled={index === 0} onClick={() => move(group, index - 1)} />
         <IconButton icon="arrow-down" label="Move down" disabled={index === count - 1} onClick={() => move(group, index + 1)} />
         <IconButton icon="trash" label="Delete requirement" onClick={remove} />
       </span>
+      {(showExamples || item.examples.length > 0) && <ExampleList group={group} index={index} examples={item.examples} />}
     </li>
   );
 }
@@ -309,6 +530,7 @@ function RequirementsSection() {
   const [creating, setCreating] = useState(false);
   const requirements = model.requirements;
   const counts = keywordCounts(model);
+  const examples = exampleCount(model);
   const groups = requirements?.groups ?? [];
   return (
     <div id={anchorId('requirements')}>
@@ -316,11 +538,14 @@ function RequirementsSection() {
         title="Requirements"
         icon="checklist"
         count={allRequirements(model).length}
-        actions={counts.map((c) => (
-          <span key={c.keyword} className={`kind-badge ${keywordClass(c.keyword)}`} title={KEYWORD_MEANINGS[c.keyword]}>
-            {c.count} {c.keyword}
-          </span>
-        ))}
+        actions={[
+          ...counts.map((c) => (
+            <span key={c.keyword} className={`kind-badge ${keywordClass(c.keyword)}`} title={KEYWORD_MEANINGS[c.keyword]}>
+              {c.count} {c.keyword}
+            </span>
+          )),
+          ...(examples ? [<span key="examples" className="kind-badge" title="Example scenarios listed under the requirements">{plural(examples, 'example')}</span>] : []),
+        ]}
       >
         <p className="muted small">
           Write each requirement as a sentence with an{' '}
@@ -328,7 +553,8 @@ function RequirementsSection() {
             RFC 2119
           </a>{' '}
           key word in capitals: <b>MUST</b> / <b>MUST NOT</b> for absolute requirements, <b>SHOULD</b> / <b>SHOULD NOT</b> for recommendations with justified
-          exceptions, <b>MAY</b> for options. Enter in a requirement moves to the add box, Shift+Enter starts a new line.
+          exceptions, <b>MAY</b> for options. Enter in a requirement moves to the add box, Shift+Enter starts a new line. The <span className="codicon codicon-beaker" aria-hidden="true" />{' '}
+          button lists example scenarios under a requirement: one concrete case each, with real values.
         </p>
         <label className="checkbox" title={`Written at the start of the section:\n${CONFORMANCE_NOTICE}`}>
           <input
@@ -371,6 +597,7 @@ export function SpecPage() {
     <div className="page spec-page">
       {issues.length > 0 && <ProblemsList issues={issues} onNavigate={goTo} />}
       <OverviewSection />
+      <InheritedSection />
       <ContextSection />
       <RequirementsSection />
       {others.length > 0 && (

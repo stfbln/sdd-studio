@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { requestFocus } from '../../../webview/focus';
 import type { ListRef, SpecEdit } from '../core/edits';
+import type { SpecEditorContext } from '../core/inherit';
 import type { SpecFile, SpecModel } from '../core/parse';
 import type { SpecAnchor, SpecIssue, SpecLocation } from '../core/summary';
 
@@ -8,9 +9,13 @@ export interface SpecEditorValue {
   doc: SpecFile;
   model: SpecModel;
   issues: SpecIssue[];
+  /** The specs of the workspace and the inherited requirements; undefined until the host sends them. */
+  context?: SpecEditorContext;
   edit(edits: SpecEdit | SpecEdit[]): void;
   /** `line` is 1-based. */
   openAsText(line?: number): void;
+  /** Opens another file of the workspace folder. */
+  openFile(path: string): void;
 }
 
 export const SpecContext = createContext<SpecEditorValue | null>(null);
@@ -25,6 +30,9 @@ export const anchorId = (anchor: SpecAnchor) => `spec-${anchor}`;
 export const groupId = (group: number) => `spec-group-${group}`;
 /** Focus keys: "main-2" is the third requirement of the ungrouped list, "g0-add" the add box of the first group. */
 export const listKey = (group: ListRef) => (group === null ? 'main' : `g${group}`);
+/** Focus key of an example: "main-2-ex-0" is the first example of the third requirement. */
+export const exampleKey = (group: ListRef, index: number, example?: number) =>
+  `${listKey(group)}-${index}-ex${example === undefined ? '-add' : `-${example}`}`;
 
 /** Last part jumped to: near the end of the page it cannot reach the top, but is still the one shown. */
 export let requestedAnchor: SpecAnchor | undefined;
@@ -37,7 +45,7 @@ export function scrollToAnchor(anchor: SpecAnchor) {
 export function goTo(location: SpecLocation) {
   if (location.index !== undefined && location.group !== undefined) {
     requestedAnchor = location.anchor;
-    requestFocus(`${listKey(location.group)}-${location.index}`);
+    requestFocus(location.example === undefined ? `${listKey(location.group)}-${location.index}` : exampleKey(location.group, location.index, location.example));
   } else {
     scrollToAnchor(location.anchor);
   }

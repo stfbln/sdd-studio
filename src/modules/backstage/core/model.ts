@@ -6,6 +6,7 @@
  * Entities point to each other with entity references (`[kind:][namespace/]name`), and to the
  * spec files of the workspace with paths relative to the catalog file.
  */
+import { dirOf, relativePath, resolvePath } from '../../../shared/files';
 import { getIn, isObject, type Json, type JsonObject, type SpecPath } from '../../../shared/structured/edits';
 import { DOCUMENTS_KEY } from '../../../shared/structured/yamlDocuments';
 
@@ -429,34 +430,8 @@ export function refsOf(info: EntityInfo): { field: RefField; position?: number; 
 
 /* Paths -------------------------------------------------------------------- */
 
-export const dirOf = (path: string) => (path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '');
-
-export const isUrl = (path: string) => /^[a-z][a-z0-9+.-]*:\/\//i.test(path);
-
-/** Workspace path of `relative` written in a file of `dir`; undefined when it leaves the workspace or is a URL. */
-export function resolvePath(dir: string, relative: string): string | undefined {
-  if (!relative.trim() || isUrl(relative)) return undefined;
-  const segments = relative.startsWith('/') ? [] : dir.split('/').filter(Boolean);
-  for (const segment of relative.split('/')) {
-    if (segment === '' || segment === '.') continue;
-    if (segment === '..') {
-      if (!segments.length) return undefined;
-      segments.pop();
-    } else segments.push(segment);
-  }
-  return segments.join('/');
-}
-
-/** Path to write in a file of `dir` to reach the workspace path `target` ("./x" or "../x"). */
-export function relativePath(dir: string, target: string): string {
-  const from = dir.split('/').filter(Boolean);
-  const to = target.split('/').filter(Boolean);
-  let common = 0;
-  while (common < from.length && common < to.length - 1 && from[common] === to[common]) common++;
-  const up = from.length - common;
-  const rest = to.slice(common).join('/');
-  return up ? `${'../'.repeat(up)}${rest}` : `./${rest}`;
-}
+/** Workspace path helpers, shared with the other modules. */
+export { dirOf, isUrl, relativePath, resolvePath } from '../../../shared/files';
 
 export const splitList = (value: unknown): string[] => str(value).split(',').map((v) => v.trim()).filter(Boolean);
 

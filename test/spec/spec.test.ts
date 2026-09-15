@@ -2,9 +2,10 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { applySpecEdits, type ListRef, type SpecEdit } from '../../src/modules/spec/core/edits';
+import { inheritanceIssues, overrideKey, parentPath, requirementsOf, type SpecInheritance } from '../../src/modules/spec/core/inherit';
 import { composeRequirement, CONFORMANCE_NOTICE, findKeyword, lowercaseKeyword, subjectOf, withKeyword } from '../../src/modules/spec/core/keywords';
 import { parseSpecMarkdown } from '../../src/modules/spec/core/parse';
-import { analyzeSpec, defaultSubject, looksLikeSpec, newSpecTemplate, summarizeSpec } from '../../src/modules/spec/core/summary';
+import { analyzeSpec, defaultSubject, exampleCount, looksLikeSpec, newSpecTemplate, summarizeSpec } from '../../src/modules/spec/core/summary';
 
 const SAMPLE = readFileSync(join(__dirname, '../../samples/specs/payment-service.spec.md'), 'utf8');
 const edit = (text: string, ...edits: SpecEdit[]) => applySpecEdits(text, edits);
@@ -64,6 +65,128 @@ describe('parsing', () => {
       ['2.', '', 'Two\n- detail\n\nmore', undefined],
       ['3)', '[x] ', 'Three MAY', 'MAY'],
     ]);
+  });
+});
+
+describe('example scenarios', () => {
+  const WITH_EXAMPLES = [
+    '# T',
+    '',
+    '## Requirements',
+    '',
+    '- The service MUST retry failed calls.',
+    '  - Example: the provider times out, the call is retried twice, and the payment goes through.',
+    '  - **Example 2:** the card is declined; nothing is retried.',
+    '    The customer is told at once.',
+    '- The service MAY log the outcome.',
+    '',
+  ].join('\n');
+
+  it('reads the examples listed under a requirement, apart from its sentence', () => {
+    const items = parseSpecMarkdown(WITH_EXAMPLES).requirements!.list.items;
+    expect(items.map((i) => i.text)).toEqual(['The service MUST retry failed calls.', 'The service MAY log the outcome.']);
+    expect(items[0].examples.map((e) => e.text)).toEqual([
+      'the provider times out, the call is retried twice, and the payment goes through.',
+      'the card is declined; nothing is retried.\nThe customer is told at once.',
+    ]);
+    expect(items[0].examples.map((e) => [e.line, e.end])).toEqual([
+      [5, 6],
+      [6, 8],
+    ]);
+    expect([items[0].line, items[0].bodyEnd, items[0].end]).toEqual([4, 5, 8]);
+    expect(exampleCount(parseSpecMarkdown(WITH_EXAMPLES))).toBe(2);
+    // A nested list that is not made of examples stays part of the sentence.
+    expect(texts('## Requirements\n\n- A MUST hold\n  - because\n')).toEqual(['A MUST hold\n- because']);
+  });
+
+  it('adds, edits, reorders and deletes examples without touching the sentence', () => {
+    let text = edit('## Requirements\n\n- A MUST hold.\n- B MAY hold.\n', { op: 'addExample', group: null, index: 0, text: 'x happens' });
+    expect(text).toBe('## Requirements\n\n- A MUST hold.\n  - Example: x happens\n- B MAY hold.\n');
+    text = edit(text, { op: 'addExample', group: null, index: 0, text: 'Example: y happens' }, { op: 'addExample', group: null, index: 1, text: 'z happens' });
+    expect(text).toBe('## Requirements\n\n- A MUST hold.\n  - Example: x happens\n  - Example: y happens\n- B MAY hold.\n  - Example: z happens\n');
+    text = edit(text, { op: 'moveExample', group: null, index: 0, example: 1, to: 0 }, { op: 'setRequirement', group: null, index: 0, text: 'A MUST really hold.' });
+    expect(text).toBe('## Requirements\n\n- A MUST really hold.\n  - Example: y happens\n  - Example: x happens\n- B MAY hold.\n  - Example: z happens\n');
+    text = edit(text, { op: 'setExample', group: null, index: 0, example: 0, text: 'y happens\ntwice' }, { op: 'deleteExample', group: null, index: 1, example: 0 });
+    expect(text).toBe('## Requirements\n\n- A MUST really hold.\n  - Example: y happens\n    twice\n  - Example: x happens\n- B MAY hold.\n');
+    expect(edit(text, { op: 'deleteRequirement', group: null, index: 0 })).toBe('## Requirements\n\n- B MAY hold.\n');
+    expect(() => edit(text, { op: 'addExample', group: null, index: 0, text: '  ' })).toThrow(/cannot be empty/);
+    expect(() => edit(text, { op: 'setExample', group: null, index: 1, example: 0, text: 'x' })).toThrow(/no longer exists/);
+  });
+
+  it('rewrites an example of a real spec and puts it back as it was', () => {
+    const first = parseSpecMarkdown(SAMPLE).requirements!.list.items[0];
+    expect(first.examples).toHaveLength(2);
+    const changed = edit(SAMPLE, { op: 'setExample', group: null, index: 0, example: 1, text: 'the provider is down\nand the customer is asked to try later.' });
+    expect(changed).toContain('  - Example: the provider is down\n    and the customer is asked to try later.\n- The service MUST record');
+    expect(edit(changed, { op: 'setExample', group: null, index: 0, example: 1, text: first.examples[1].text })).toBe(SAMPLE);
+  });
+
+  it('keeps the examples with their requirement when it moves to another group', () => {
+    const text = '## Requirements\n\n* A MUST hold.\n  * Example: x happens\n* B MAY hold.\n\n### Ops\n\n- C SHOULD hold.\n';
+    const moved = edit(text, { op: 'moveRequirement', group: null, index: 0, toGroup: 0 });
+    expect(moved).toBe('## Requirements\n\n* B MAY hold.\n\n### Ops\n\n- C SHOULD hold.\n- A MUST hold.\n  - Example: x happens\n');
+    expect(parseSpecMarkdown(moved).requirements!.groups[0].items[1].examples.map((e) => e.text)).toEqual(['x happens']);
+  });
+
+  it('reports empty and repeated examples', () => {
+    const text = '# A\n\n## Requirements\n\n- A MUST hold.\n  - Example: x\n  - Example:\n  - Example: X\n';
+    expect(analyzeSpec(parseSpecMarkdown(text)).map((i) => [i.message, i.location.example])).toEqual([
+      ['Requirement 1: example 2 is empty', 1],
+      ['Requirement 1: example 3 is listed twice', 2],
+    ]);
+  });
+});
+
+describe('specs extending another spec', () => {
+  const CHILD = '# Ephemeral storage\n\nExtends: [Data storage](../generics/data-storage.spec.md)\n\nCaches and scratch space.\n\n## Requirements\n\n- Data MUST be dropped after 24 hours.\n';
+
+  it('reads the Extends line under the title, apart from the description', () => {
+    const model = parseSpecMarkdown(CHILD);
+    expect(model.extends).toEqual({ label: 'Data storage', target: '../generics/data-storage.spec.md', line: 2 });
+    expect(model.description.text).toBe('Caches and scratch space.');
+    expect(parseSpecMarkdown('# T\n\n**Extends:** <../a b.spec.md>\n').extends).toEqual({ label: '', target: '../a b.spec.md', line: 2 });
+    // Only the first thing written under the title, and only when it names a file.
+    expect(parseSpecMarkdown('# T\n\nA policy.\n\nExtends: [X](x.spec.md)\n').extends).toBeUndefined();
+    expect(parseSpecMarkdown('# T\n\nExtends the base policy.\n').extends).toBeUndefined();
+    expect(parseSpecMarkdown(CHILD).sections.map((s) => s.kind)).toEqual(['requirements']);
+  });
+
+  it('writes, replaces and removes the Extends line, leaving the description alone', () => {
+    let text = edit('# Ephemeral storage\n\nCaches.\n', { op: 'setExtends', value: '../generics/data-storage.spec.md', label: 'Data storage' });
+    expect(text).toBe('# Ephemeral storage\n\nExtends: [Data storage](../generics/data-storage.spec.md)\n\nCaches.\n');
+    text = edit(text, { op: 'setDescription', value: 'Caches and scratch space.' });
+    expect(text).toBe('# Ephemeral storage\n\nExtends: [Data storage](../generics/data-storage.spec.md)\n\nCaches and scratch space.\n');
+    expect(edit(text, { op: 'setExtends', value: './other.spec.md' })).toBe(text.replace('[Data storage](../generics/data-storage.spec.md)', '[other.spec.md](./other.spec.md)'));
+    expect(edit(text, { op: 'setExtends', value: '' })).toBe('# Ephemeral storage\n\nCaches and scratch space.\n');
+    // Without a title, it stays above the description; a title added later goes on top.
+    const untitled = edit('Caches.\n', { op: 'setExtends', value: 'a.spec.md' });
+    expect(untitled).toBe('Extends: [a.spec.md](a.spec.md)\n\nCaches.\n');
+    expect(edit(untitled, { op: 'setTitle', value: 'Ephemeral' })).toBe('# Ephemeral\n\nExtends: [a.spec.md](a.spec.md)\n\nCaches.\n');
+    expect(edit('# T\n', { op: 'setExtends', value: '../a b.spec.md', label: 'A b' })).toBe('# T\n\nExtends: [A b](<../a b.spec.md>)\n');
+  });
+
+  it('resolves the parent, reads its requirements and reports what a child repeats', () => {
+    expect(parentPath('specs/policies/ephemeral.spec.md', '../generics/data-storage.spec.md')).toBe('specs/generics/data-storage.spec.md');
+    expect(parentPath('specs/a.spec.md', '../../outside.spec.md')).toBeUndefined();
+    expect(parentPath('specs/a.spec.md', undefined)).toBeUndefined();
+    expect(overrideKey('Data SHOULD be encrypted at rest.')).toBe(overrideKey('Data MUST be encrypted at rest'));
+
+    const parent = parseSpecMarkdown('# Data storage\n\n## Requirements\n\n- Data SHOULD be encrypted at rest.\n  - Example: a backup file is written with SSE-KMS.\n\n### Retention\n\n- Data MUST have a retention limit.\n');
+    expect(requirementsOf(parent)).toEqual([
+      { group: null, text: 'Data SHOULD be encrypted at rest.', keyword: 'SHOULD', examples: ['a backup file is written with SSE-KMS.'] },
+      { group: 'Retention', text: 'Data MUST have a retention limit.', keyword: 'MUST', examples: [] },
+    ]);
+
+    const inheritance: SpecInheritance = { chain: [{ path: 'specs/generics/data-storage.spec.md', title: 'Data storage', requirements: requirementsOf(parent), depth: 1 }] };
+    const child = parseSpecMarkdown('# Persistent storage\n\n## Requirements\n\n- Data MUST be encrypted at rest.\n- Data SHOULD have a retention limit.\n\n### Backups\n\n- Data MUST have a retention limit.\n');
+    // Raising the level of an inherited requirement is an override, restating it as it is is not.
+    expect(inheritanceIssues(child, inheritance).map((i) => [i.message, i.location.group])).toEqual([
+      ['Backups: requirement 1 repeats a requirement inherited from "Data storage"', 0],
+    ]);
+    expect(inheritanceIssues(child, { chain: [], problem: 'The spec it extends was not found: x.spec.md.' }).map((i) => i.message)).toEqual([
+      'The spec it extends was not found: x.spec.md.',
+    ]);
+    expect(inheritanceIssues(child, undefined)).toEqual([]);
   });
 });
 
@@ -187,9 +310,11 @@ describe('catalog and checks', () => {
     expect(summarizeSpec('payment-service.spec.md', SAMPLE)).toEqual({
       name: 'Payment service',
       tags: [],
-      details: ['6 requirements', '2 MUST · 1 MUST NOT · 1 SHOULD · 1 SHOULD NOT · 1 MAY'],
+      details: ['6 requirements', '2 MUST · 1 MUST NOT · 1 SHOULD · 1 SHOULD NOT · 1 MAY', '3 examples'],
       problems: 0,
     });
+    const child = readFileSync(join(__dirname, '../../samples/specs/ephemeral-storage.spec.md'), 'utf8');
+    expect(summarizeSpec('ephemeral-storage.spec.md', child)).toMatchObject({ name: 'Ephemeral storage', details: expect.arrayContaining(['extends Data storage']), problems: 0 });
     expect(summarizeSpec('x.spec.md', 'Nothing')).toMatchObject({ name: '', details: ['No requirements yet'], problems: 1 });
     expect(defaultSubject(parseSpecMarkdown(SAMPLE))).toBe('The back office');
     expect(defaultSubject(parseSpecMarkdown('# Cart\n'))).toBe('Cart');

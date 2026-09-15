@@ -4,9 +4,10 @@ import { groupId, scrollToAnchor, useSpec } from './state';
 
 /** Outline of the page: clicking scrolls to the part, the part in view is highlighted. */
 export function Nav({ current }: { current: SpecAnchor }) {
-  const { model, issues, openAsText } = useSpec();
+  const { model, issues, context, openAsText } = useSpec();
   const others = model.sections.filter((s) => s.kind === 'other');
   const groups = model.requirements?.groups ?? [];
+  const chain = context?.inheritance.chain ?? [];
   const issuesAt = (anchor: SpecAnchor) => issues.filter((i) => i.location.anchor === anchor);
 
   return (
@@ -15,6 +16,13 @@ export function Nav({ current }: { current: SpecAnchor }) {
         <span className="codicon codicon-book" aria-hidden="true" />
         <span className="path-label">{model.title?.text || 'Overview'}</span>
       </NavItem>
+      {(model.extends || chain.length > 0) && (
+        <NavItem active={current === 'inherited'} onClick={() => scrollToAnchor('inherited')} issues={issuesAt('inherited')}>
+          <span className="codicon codicon-type-hierarchy" aria-hidden="true" />
+          <span className="path-label">{chain[0]?.title || chain[0]?.path || model.extends?.label || 'Inherited'}</span>
+          <span className="op-label muted">{chain.reduce((count, spec) => count + spec.requirements.length, 0)}</span>
+        </NavItem>
+      )}
       <NavItem active={current === 'context'} onClick={() => scrollToAnchor('context')} issues={issuesAt('context')}>
         <span className="codicon codicon-globe" aria-hidden="true" /> Context
         {!model.context?.text && <span className="op-label muted">empty</span>}

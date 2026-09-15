@@ -1,5 +1,18 @@
+import { baseName } from '../../../shared/files';
 import { CONFORMANCE_NOTICE } from './keywords';
-import { blockText, fencedLines, isBlank, parseSpecMarkdown, scanFences, splitLines, type Requirement, type RequirementList, type SpecModel } from './parse';
+import {
+  blockText,
+  EXAMPLE_LABEL,
+  fencedLines,
+  isBlank,
+  parseSpecMarkdown,
+  scanFences,
+  splitLines,
+  type Example,
+  type Requirement,
+  type RequirementList,
+  type SpecModel,
+} from './parse';
 
 /**
  * Changes the form makes to a markdown spec. Each one rewrites only the lines concerned; a section
@@ -8,6 +21,8 @@ import { blockText, fencedLines, isBlank, parseSpecMarkdown, scanFences, splitLi
 export type SpecEdit =
   /** An empty value removes the title. */
   | { op: 'setTitle'; value: string }
+  /** The spec this one inherits its requirements from: a path relative to this file, empty to remove the line. */
+  | { op: 'setExtends'; value: string; label?: string }
   | { op: 'setDescription'; value: string }
   | { op: 'setContext'; value: string }
   /** The BCP 14 sentence at the start of the Requirements section. */
@@ -18,6 +33,11 @@ export type SpecEdit =
   | { op: 'deleteRequirement'; group: ListRef; index: number }
   /** `toIndex` is the position in the target list once moved (appends when omitted). */
   | { op: 'moveRequirement'; group: ListRef; index: number; toGroup: ListRef; toIndex?: number }
+  /** Example scenarios of one requirement: nested "- Example: ..." items under it. Appends by default. */
+  | { op: 'addExample'; group: ListRef; index: number; text: string; at?: number }
+  | { op: 'setExample'; group: ListRef; index: number; example: number; text: string }
+  | { op: 'deleteExample'; group: ListRef; index: number; example: number }
+  | { op: 'moveExample'; group: ListRef; index: number; example: number; to: number }
   /** Appended after the other groups, with its first requirement when `text` is given. */
   | { op: 'addGroup'; name: string; text?: string }
   | { op: 'renameGroup'; group: number; name: string }
@@ -58,10 +78,25 @@ export const normalizeRequirement = (value: string) => {
   return text && closeFences(text);
 };
 
-function renderItem(marker: string, checkbox: string, text: string): string[] {
+/** An example is written under its requirement, so its own "Example:" label is not repeated. */
+export const normalizeExample = (value: string) => normalizeRequirement(value).replace(EXAMPLE_LABEL, '');
+
+/** Wraps a text under a list marker: "- <first>", continuation lines aligned with it. */
+function renderLines(indent: string, marker: string, prefix: string, text: string): string[] {
   const [first, ...rest] = text.split('\n');
-  const indent = ' '.repeat(marker.length + 1);
-  return [`${marker} ${checkbox}${first}`.trimEnd(), ...rest.map((l) => (l.trim() ? indent + l : ''))];
+  const inner = indent + ' '.repeat(marker.length + 1);
+  return [`${indent}${marker} ${prefix}${first}`.trimEnd(), ...rest.map((l) => (l.trim() ? inner + l : ''))];
+}
+
+/** "  - Example: ..." under a requirement whose text starts at column `indent`. */
+function renderExample(indent: number, marker: string, text: string): string[] {
+  return renderLines(' '.repeat(indent), marker, 'Example: ', text);
+}
+
+function renderItem(marker: string, checkbox: string, text: string, examples: string[] = [], exampleMarker = '-'): string[] {
+  const lines = renderLines('', marker, checkbox, text);
+  for (const example of examples) lines.push(...renderExample(marker.length + 1, exampleMarker, example));
+  return lines;
 }
 
 /** Marker for an item inserted at `index`, following the style of the list. */
@@ -139,6 +174,25 @@ function setTitle(doc: Lines, value: string) {
   }
 }
 
+/** "Extends: [Title](path)" right under the title; an empty path removes the line. */
+function setExtends(doc: Lines, value: string, label?: string) {
+  const model = doc.model;
+  const target = normalizeTitle(value);
+  const current = model.extends;
+  if (!target) {
+    if (current) doc.removeBlock(current.line, current.line + 1);
+    return;
+  }
+  const text = normalizeTitle(label ?? '').replace(/[[\]]/g, '') || baseName(target);
+  const destination = /[()\s]/.test(target) ? `<${target}>` : target;
+  const line = `Extends: [${text}](${destination})`;
+  if (current) {
+    if (doc.lines[current.line] !== line) doc.replace(current.line, current.line + 1, [line]);
+  } else {
+    doc.insertBlock(model.title ? model.title.line + 1 : model.bodyStart, [line]);
+  }
+}
+
 function setContext(doc: Lines, value: string) {
   const model = doc.model;
   const text = normalizeBlock(value);
@@ -187,16 +241,16 @@ function insertSection(doc: Lines, block: string[]) {
   doc.insertBlock(at, ['## Requirements', '', CONFORMANCE_NOTICE, '', ...block]);
 }
 
-function addRequirement(doc: Lines, ref: ListRef, value: string, index?: number, checkbox = '', forceLoose?: boolean) {
+function addRequirement(doc: Lines, ref: ListRef, value: string, index?: number, checkbox = '', forceLoose?: boolean, examples: string[] = []) {
   const model = doc.model;
   const text = normalizeRequirement(value);
-  if (!model.requirements && ref === null) return insertSection(doc, renderItem('-', checkbox, text));
+  if (!model.requirements && ref === null) return insertSection(doc, renderItem('-', checkbox, text, examples));
   const list = listOf(model, ref);
   if (!list) throw new Error('This group of requirements no longer exists in the file.');
 
   const { items } = list;
   const position = Math.max(0, Math.min(index ?? items.length, items.length));
-  const block = renderItem(markerAt(items, position), checkbox, text);
+  const block = renderItem(markerAt(items, position), checkbox, text, examples);
   const loose = forceLoose ?? list.loose;
   if (!items.length) {
     // After the notes of the list (or the conformance sentence), before the next group.
@@ -211,13 +265,39 @@ function addRequirement(doc: Lines, ref: ListRef, value: string, index?: number,
   }
 }
 
+/** The requirement an example edit is about, with the list holding it. */
+function requirementOf(model: SpecModel, group: ListRef, index: number): Requirement {
+  const item = listOf(model, group)?.items[index];
+  if (!item) throw new Error(`Requirement ${index + 1} no longer exists in the file.`);
+  return item;
+}
+
+function exampleOf(item: Requirement, index: number): Example {
+  const example = item.examples[index];
+  if (!example) throw new Error(`Example ${index + 1} no longer exists in the file.`);
+  return example;
+}
+
+function addExample(doc: Lines, group: ListRef, index: number, value: string, at?: number) {
+  const text = normalizeExample(value);
+  if (!text) throw new Error('An example cannot be empty.');
+  const item = requirementOf(doc.model, group, index);
+  const { examples } = item;
+  const position = Math.max(0, Math.min(at ?? examples.length, examples.length));
+  const block = renderExample(item.indent, examples[0]?.marker ?? '-', text);
+  const line = position < examples.length ? examples[position].line : (examples[examples.length - 1]?.end ?? item.bodyEnd);
+  doc.replace(line, line, block);
+}
+
 function applyOne(doc: Lines, edit: SpecEdit) {
   const model = doc.model;
   switch (edit.op) {
     case 'setTitle':
       return setTitle(doc, edit.value);
+    case 'setExtends':
+      return setExtends(doc, edit.value, edit.label);
     case 'setDescription':
-      return doc.setBlock(model.description.start, model.description.end, normalizeBlock(edit.value), model.title ? model.title.line + 1 : model.bodyStart);
+      return doc.setBlock(model.description.start, model.description.end, normalizeBlock(edit.value), model.extends ? model.extends.line + 1 : model.title ? model.title.line + 1 : model.bodyStart);
     case 'setContext':
       return setContext(doc, edit.value);
     case 'setNotice': {
@@ -230,6 +310,27 @@ function applyOne(doc: Lines, edit: SpecEdit) {
     case 'addRequirement':
       if (!normalizeRequirement(edit.text)) throw new Error('A requirement cannot be empty.');
       return addRequirement(doc, edit.group, edit.text, edit.index);
+    case 'addExample':
+      return addExample(doc, edit.group, edit.index, edit.text, edit.at);
+    case 'setExample': {
+      const item = requirementOf(model, edit.group, edit.index);
+      const example = exampleOf(item, edit.example);
+      const text = normalizeExample(edit.text);
+      if (text !== example.text) doc.replace(example.line, example.end, renderExample(item.indent, example.marker, text));
+      return;
+    }
+    case 'deleteExample': {
+      const example = exampleOf(requirementOf(model, edit.group, edit.index), edit.example);
+      return doc.removeBlock(example.line, example.end);
+    }
+    case 'moveExample': {
+      const item = requirementOf(model, edit.group, edit.index);
+      const example = exampleOf(item, edit.example);
+      const to = Math.max(0, Math.min(edit.to, item.examples.length - 1));
+      if (to === edit.example) return;
+      doc.removeBlock(example.line, example.end);
+      return addExample(doc, edit.group, edit.index, example.text, to);
+    }
     case 'addGroup': {
       const name = normalizeTitle(edit.name);
       const text = normalizeRequirement(edit.text ?? '');
@@ -261,8 +362,9 @@ function applyOne(doc: Lines, edit: SpecEdit) {
   if (!list || !item) throw new Error(`Requirement ${edit.index + 1} no longer exists in the file.`);
   switch (edit.op) {
     case 'setRequirement': {
+      // Only the sentence is rewritten: the examples listed under it stay where they are.
       const text = normalizeRequirement(edit.text);
-      if (text !== item.text) doc.replace(item.line, item.end, renderItem(item.marker, item.checkbox, text));
+      if (text !== item.text) doc.replace(item.line, item.bodyEnd, renderItem(item.marker, item.checkbox, text));
       return;
     }
     case 'deleteRequirement':
@@ -273,7 +375,15 @@ function applyOne(doc: Lines, edit: SpecEdit) {
       if (same && (edit.toIndex ?? list.items.length - 1) === edit.index) return;
       if (!same && !listOf(model, edit.toGroup)) throw new Error('The target group no longer exists in the file.');
       doc.removeBlock(item.line, item.end);
-      return addRequirement(doc, edit.toGroup, item.text || ' ', edit.toIndex, item.checkbox, same ? list.loose : undefined);
+      return addRequirement(
+        doc,
+        edit.toGroup,
+        item.text || ' ',
+        edit.toIndex,
+        item.checkbox,
+        same ? list.loose : undefined,
+        item.examples.map((e) => e.text),
+      );
     }
   }
 }

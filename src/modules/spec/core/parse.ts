@@ -13,11 +13,28 @@ export interface Heading {
   line: number;
 }
 
-export interface Requirement {
-  /** Item text without its marker; continuation lines are de-indented. */
+/** One concrete case a requirement is illustrated with: a nested "- Example: ..." item under it. */
+export interface Example {
+  /** Text after the "Example:" label; continuation lines are de-indented. */
   text: string;
   line: number;
   end: number;
+  /** "-", "*", "+", "1." or "1)". */
+  marker: string;
+}
+
+export interface Requirement {
+  /** Sentence of the requirement without its marker and without its examples; continuation lines are de-indented. */
+  text: string;
+  line: number;
+  /** End of the whole item, examples included. */
+  end: number;
+  /** End of the sentence: where the examples start. */
+  bodyEnd: number;
+  /** Example scenarios listed under the requirement. */
+  examples: Example[];
+  /** Column the text of the item starts at, so examples are written under it. */
+  indent: number;
   /** "-", "*", "+", "1." or "1)". */
   marker: string;
   /** Task list box ("[ ] ", "[x] ") kept in front of the text. */
@@ -49,13 +66,24 @@ export interface Section {
   kind: 'context' | 'requirements' | 'other';
 }
 
+/** The "Extends: [Title](path)" line under the title: the spec this one inherits its requirements from. */
+export interface SpecExtends {
+  /** Text of the link, e.g. "Data storage" (empty when the path is written on its own). */
+  label: string;
+  /** Path as written, relative to this file. */
+  target: string;
+  line: number;
+}
+
 export interface SpecModel {
   /** First line after the front matter and the HTML comments that follow it. */
   bodyStart: number;
   title?: Heading;
   /** Level-1 headings after the first one. */
   extraTitles: Heading[];
-  /** Lines between the title (or the start) and the first section. */
+  /** The spec this one extends, written right under the title. */
+  extends?: SpecExtends;
+  /** Lines between the title (or the Extends line, or the start) and the first section. */
   description: { text: string; start: number; end: number };
   sections: Section[];
   context?: { section: Section; text: string };
@@ -78,6 +106,14 @@ export interface SpecFile {
 const HEADING = /^(#{1,6})(?:[ \t]+(.*?))?[ \t]*$/;
 const FENCE = /^ {0,3}(`{3,}|~{3,})/;
 const ITEM = /^( {0,3})([-*+]|\d{1,9}[.)])(?:([ \t]+)(\[[ xX]\][ \t]+)?(.*)|[ \t]*)$/;
+/** A list item nested under a requirement, once the item's own indentation is removed. */
+const NESTED_ITEM = /^( {0,3})([-*+]|\d{1,9}[.)])[ \t]+(.*)$/;
+/** "Example:", "Example 2:", "**Example:**"... in front of an example scenario. */
+export const EXAMPLE_LABEL = /^[*_]{0,2}example[ \t]*\d*[*_]{0,2}[ \t]*:[ \t]*[*_]{0,2}[ \t]*/i;
+/** "Extends: [Title](path)", "**Extends:** path"... */
+const EXTENDS = /^[ \t]*(?:[*_]{1,2})?extends(?:[*_]{1,2})?[ \t]*:[ \t]*(?:[*_]{1,2})?[ \t]*(.+?)[ \t]*$/i;
+/** A markdown link, with the destination in angle brackets when it has spaces. */
+const LINK = /^\[([^\]]*)\][ \t]*\([ \t]*(?:<([^>]*)>|([^)\s]*))[ \t]*(?:"[^"]*")?[ \t]*\)$/;
 
 export const splitLines = (text: string) => text.replace(/\r\n?/g, '\n').split('\n');
 export const isBlank = (line: string | undefined) => line !== undefined && line.trim() === '';
@@ -114,8 +150,7 @@ export function scanFences(lines: string[]): { inFence: boolean[]; open?: string
 
 export const fencedLines = (lines: string[]) => scanFences(lines).inFence;
 
-function headingsOf(lines: string[], start: number): Heading[] {
-  const inFence = fencedLines(lines);
+function headingsOf(lines: string[], start: number, inFence: boolean[]): Heading[] {
   const headings: Heading[] = [];
   for (let line = start; line < lines.length; line++) {
     const match = inFence[line] ? null : HEADING.exec(lines[line]);
@@ -151,6 +186,43 @@ export function blockText(lines: string[], start: number, end: number): string {
   while (first <= last && isBlank(lines[first])) first++;
   while (last >= first && isBlank(lines[last])) last--;
   return lines.slice(first, last + 1).join('\n').replace(/\s+$/, '');
+}
+
+/**
+ * Splits the content of a requirement into its sentence and its example scenarios: everything from
+ * the first nested "Example:" item on is examples. `base` is the line the content starts at, so the
+ * examples carry their line in the file (content line `i` is line `base + i`).
+ */
+function splitExamples(content: string[], base: number): { body: string[]; examples: Example[] } {
+  const inFence = fencedLines(content);
+  let start = -1;
+  for (let i = 1; i < content.length && start < 0; i++) {
+    const match = inFence[i] ? null : NESTED_ITEM.exec(content[i]);
+    if (match && EXAMPLE_LABEL.test(match[3])) start = i;
+  }
+  if (start < 0) return { body: content, examples: [] };
+
+  const examples: Example[] = [];
+  const parts: string[][] = [];
+  let indent = 0;
+  for (let i = start; i < content.length; i++) {
+    const match = inFence[i] ? null : NESTED_ITEM.exec(content[i]);
+    if (match) {
+      indent = match[1].length + match[2].length + 1;
+      examples.push({ text: '', line: base + i, end: base + i + 1, marker: match[2] });
+      parts.push([match[3].replace(EXAMPLE_LABEL, '')]);
+    } else if (examples.length) {
+      // Continuation of the example above: kept with it, blank lines included.
+      parts[parts.length - 1].push(isBlank(content[i]) ? '' : dedent(content[i], indent));
+      if (!isBlank(content[i])) examples[examples.length - 1].end = base + i + 1;
+    }
+  }
+  for (const [i, example] of examples.entries()) {
+    example.text = parts[i].join('\n').replace(/\s+$/, '');
+  }
+  let body = start;
+  while (body > 0 && isBlank(content[body - 1])) body--;
+  return { body: content.slice(0, body), examples };
 }
 
 /** Top-level list items of a range, and whether anything else is written there. */
@@ -194,9 +266,21 @@ export function parseItems(lines: string[], start: number, end: number, inFence:
       next++;
     }
     if (items.length && line > items[items.length - 1].end) loose ||= lines.slice(items[items.length - 1].end, line).some(isBlank);
-    const itemText = content.join('\n').replace(/\s+$/, '');
+    const { body, examples } = splitExamples(content, line);
+    const itemText = body.join('\n').replace(/\s+$/, '');
     const keyword = findKeyword(itemText);
-    items.push({ text: itemText, line, end: last + 1, marker, checkbox: checkbox.replace(/[ \t]+$/, ' '), keyword: keyword?.keyword, written: keyword?.written });
+    items.push({
+      text: itemText,
+      line,
+      end: last + 1,
+      bodyEnd: line + body.length,
+      examples,
+      indent: contentIndent,
+      marker,
+      checkbox: checkbox.replace(/[ \t]+$/, ' '),
+      keyword: keyword?.keyword,
+      written: keyword?.written,
+    });
     line = last + 1;
   }
   return { items, otherContent, loose };
@@ -211,6 +295,19 @@ function findNotice(lines: string[], start: number, end: number, inFence: boolea
     if (isConformanceNotice(lines.slice(line, last + 1).join(' '))) return { start: line, end: last + 1 };
   }
   return undefined;
+}
+
+/** The "Extends: ..." line, when it is the first thing written under the title. */
+export function parseExtendsLine(raw: string): { label: string; target: string } | undefined {
+  const value = EXTENDS.exec(raw)?.[1];
+  if (!value) return undefined;
+  const link = LINK.exec(value);
+  if (link) {
+    const target = (link[2] ?? link[3] ?? '').trim();
+    return target ? { label: link[1].trim(), target } : undefined;
+  }
+  const target = value.replace(/^[`<]+|[`>]+$/g, '').trim();
+  return target ? { label: '', target } : undefined;
 }
 
 /** Skips HTML comments at the top of the body (update instructions, lint settings): they belong to no section. */
@@ -241,7 +338,8 @@ export function parseSpecMarkdown(text: string): SpecModel {
   }
   bodyStart = afterLeadingComments(lines, bodyStart);
 
-  const headings = headingsOf(lines, bodyStart);
+  const inFence = fencedLines(lines);
+  const headings = headingsOf(lines, bodyStart, inFence);
   const titles = headings.filter((h) => h.level === 1);
   const title = titles[0];
   // Sections are the `##` headings; any level-1 heading also ends a section.
@@ -256,11 +354,17 @@ export function parseSpecMarkdown(text: string): SpecModel {
 
   const descriptionStart = title ? title.line + 1 : bodyStart;
   const descriptionEnd = boundaries.find((b) => b.line >= descriptionStart)?.line ?? lines.length;
+  // The spec extended is written first, above the description.
+  let first = descriptionStart;
+  while (first < descriptionEnd && isBlank(lines[first])) first++;
+  const inheritance = first < descriptionEnd && !inFence[first] ? parseExtendsLine(lines[first]) : undefined;
+  const contentStart = inheritance ? first + 1 : descriptionStart;
   const model: SpecModel = {
     bodyStart,
     title,
     extraTitles: titles.slice(1),
-    description: { text: blockText(lines, descriptionStart, descriptionEnd), start: descriptionStart, end: descriptionEnd },
+    ...(inheritance ? { extends: { ...inheritance, line: first } } : {}),
+    description: { text: blockText(lines, contentStart, descriptionEnd), start: contentStart, end: descriptionEnd },
     sections,
     lineCount: lines.length,
   };
@@ -270,7 +374,6 @@ export function parseSpecMarkdown(text: string): SpecModel {
 
   const requirements = sections.find((s) => s.kind === 'requirements');
   if (requirements) {
-    const inFence = fencedLines(lines);
     const subheadings = headings.filter((h) => h.level === 3 && h.line > requirements.heading.line && h.line < requirements.end);
     const listStart = requirements.heading.line + 1;
     const listEnd = subheadings[0]?.line ?? requirements.end;

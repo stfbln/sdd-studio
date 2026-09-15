@@ -30,14 +30,41 @@ How to update this file (for people and AI assistants): a Markdown specification
 - Keep this comment.
 -->
 
-# Notifications
+# Persistent storage
 
-Sends emails and push notifications when an order changes.
+Extends: [Data storage](./data-storage.spec.md)
+
+Stores the shop is expected to still hold the same data next year: orders,
+payments, invoices and customer accounts.
+
+## Context
+
+The orders database and the invoice bucket. What they hold is read by support,
+by the accounting team and, for invoices, by the tax authority.
 
 ## Requirements
 
 The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as described in BCP 14 [[RFC2119](https://www.rfc-editor.org/rfc/rfc2119)] [[RFC8174](https://www.rfc-editor.org/rfc/rfc8174)] when, and only when, they appear in all capitals, as shown here.
 
-### Platform
+- Data MUST be encrypted at rest.
+- Every store MUST have a retention limit written in the catalog entry of each
+  data asset it holds.
+  - Example: invoices are kept for ten years, then deleted by the archive job.
+- Backups MUST be taken every day and kept for 35 days.
+- A restore MUST be tested every quarter, on a real backup, in the staging
+  environment.
+  - Example: the January test restores the orders database of 6 January into
+    staging and the checkout runs against it for a day.
+- The recovery point objective MUST be 15 minutes at most, and the recovery
+  time objective 4 hours at most.
+  - Example: the primary database is lost at 10:05; the standby takes over at
+    10:20 with the transactions written until 10:04.
+- A schema change that drops or renames a column MUST be released in two steps,
+  so the previous version of the component keeps running.
 
-- The service MUST expose prometheus metrics at `/metrics`
+### Deletion
+
+- A deletion asked for by a customer MUST also remove the data from the backups
+  within 35 days, or the backups MUST be encrypted with a key destroyed on the
+  same schedule.
+- An archived store SHOULD be read-only.

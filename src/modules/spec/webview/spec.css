@@ -139,6 +139,112 @@ select.kw {
   padding-left: 18px;
 }
 
+/* Extends: the spec this one inherits from ---------------------------------- */
+
+.extends-field {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.extends-field > .input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Inherited requirements: read-only, they are edited in the spec that states them. */
+
+.inherited-spec + .inherited-spec {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--sdd-border);
+}
+
+.inherited-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.inherited-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.inherited-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 6px;
+}
+
+.inherited-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.inherited-text .overridden {
+  text-decoration: line-through;
+  color: var(--sdd-muted);
+}
+
+.inherited-text > .op-label {
+  align-self: flex-start;
+}
+
+/* Example scenarios of a requirement ---------------------------------------- */
+
+.requirement-examples {
+  grid-column: 3 / -1;
+  min-width: 0;
+}
+
+.example-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 2px 0 0;
+  padding: 0 0 0 10px;
+  border-left: 2px solid var(--sdd-border);
+  list-style: none;
+}
+
+.example-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 6px;
+  font-size: 0.95em;
+}
+
+.example-row.read-only {
+  grid-template-columns: auto minmax(0, 1fr);
+  color: var(--sdd-muted);
+}
+
+.example-label {
+  padding-top: 4px;
+  color: var(--sdd-muted);
+  font-size: 0.9em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.example-add .input:not(:focus):placeholder-shown {
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--sdd-border);
+}
+
 /* Rows follow the width they get (narrow editor groups), not the window width. */
 @container (max-width: 560px) {
   .requirement-row {
@@ -160,6 +266,10 @@ select.kw {
 
   .requirement-add {
     flex-wrap: wrap;
+  }
+
+  .requirement-examples {
+    grid-column: 2;
   }
 }
 

@@ -9,6 +9,7 @@ import type { SddModule } from '../types';
 import { applySpecEdits, type SpecEdit } from './core/edits';
 import { parseSpecFile } from './core/parse';
 import { looksLikeSpec, SPEC_EXTENSION } from './core/summary';
+import { computeSpecContext } from './host/context';
 import { specKind } from './host/specKind';
 
 /** Other markdown files get the "Open in Form Editor" button when they look like a spec. */
@@ -29,6 +30,10 @@ export const specModule: SddModule = {
         format: () => 'markdown',
         parse: (text) => ({ ok: true, value: parseSpecFile(text), formattingDrift: false }),
         apply: (text, _format, edits) => applySpecEdits(text, edits as SpecEdit[]),
+      },
+      context: {
+        compute: (document) => computeSpecContext(document, index),
+        onDidChange: index.onDidChange,
       },
     });
     context.subscriptions.push(index, editor.register(), CatalogPanel.registerSerializer(context, index));
