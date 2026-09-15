@@ -29,7 +29,7 @@ const engine: LocalEngine<SpecFile, SpecEdit> = {
   },
 };
 
-const ANCHORS: SpecAnchor[] = ['overview', 'inherited', 'context', 'requirements'];
+const ANCHORS: SpecAnchor[] = ['overview', 'context', 'requirements'];
 
 /** The part of the page at the top of the scrolled pane. */
 function useVisibleAnchor(ready: boolean) {

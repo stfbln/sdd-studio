@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { applySpecEdits, type ListRef, type SpecEdit } from '../../src/modules/spec/core/edits';
-import { inheritanceIssues, overrideKey, parentPath, requirementsOf, type SpecInheritance } from '../../src/modules/spec/core/inherit';
+import { groupKey, inheritanceIssues, mergeInherited, overrideKey, parentPath, requirementsOf, type SpecInheritance } from '../../src/modules/spec/core/inherit';
 import { composeRequirement, CONFORMANCE_NOTICE, findKeyword, lowercaseKeyword, subjectOf, withKeyword } from '../../src/modules/spec/core/keywords';
 import { parseSpecMarkdown } from '../../src/modules/spec/core/parse';
 import { analyzeSpec, defaultSubject, exampleCount, looksLikeSpec, newSpecTemplate, summarizeSpec } from '../../src/modules/spec/core/summary';
@@ -199,6 +199,36 @@ describe('specs extending other specs', () => {
     expect(summarizeSpec('x.spec.md', '# T\n\nExtends: [A](./a.spec.md), [B](./b.spec.md)\n').details).toContain('extends A, B');
   });
 
+  it('lays the inherited requirements out in the groups of the form, closest spec first', () => {
+    const storage = parseSpecMarkdown('# Data storage\n\n## Requirements\n\n- Data SHOULD be encrypted at rest.\n\n### Retention\n\n- Data MUST have a retention limit.\n');
+    const audit = parseSpecMarkdown('# Audit logging\n\n## Requirements\n\n- Data MUST be encrypted at rest.\n\n### retention\n\n- Every read MUST be logged.\n');
+    const inheritance: SpecInheritance = {
+      chain: [
+        { path: 'specs/data-storage.spec.md', title: 'Data storage', requirements: requirementsOf(storage), depth: 1 },
+        { path: 'specs/audit-logging.spec.md', title: 'Audit logging', requirements: requirementsOf(audit), depth: 2, via: 'specs/data-storage.spec.md' },
+      ],
+      problems: [],
+    };
+    const child = parseSpecMarkdown('# Persistent storage\n\n## Requirements\n\n- Data MUST be encrypted at rest.\n\n### Backups\n\n- Backups MUST be taken every day.\n');
+    const merged = mergeInherited(child, inheritance);
+    expect(merged.total).toBe(4);
+    // The ungrouped requirements of both specs, the nearest first; the child states the first one itself.
+    expect(merged.byGroup.get('')?.map((e) => [e.spec.title, e.requirement.text, e.overridden])).toEqual([
+      ['Data storage', 'Data SHOULD be encrypted at rest.', { by: '', keyword: 'MUST' }],
+      ['Audit logging', 'Data MUST be encrypted at rest.', { by: '', keyword: 'MUST' }],
+    ]);
+    // Groups are matched whatever their case, and one the child does not have is listed apart.
+    expect(merged.byGroup.get('retention')?.map((e) => e.requirement.text)).toEqual(['Data MUST have a retention limit.', 'Every read MUST be logged.']);
+    expect(merged.extraGroups).toEqual(['Retention']);
+    expect(merged.byGroup.get('backups')).toBeUndefined();
+    expect(groupKey(' Retention ')).toBe('retention');
+
+    // Without the child stating it, the nearest spec applies and the farther one is marked as overridden by it.
+    const plain = mergeInherited(parseSpecMarkdown('# P\n'), inheritance);
+    expect(plain.byGroup.get('')?.map((e) => e.overridden)).toEqual([undefined, { by: 'Data storage', keyword: 'SHOULD' }]);
+    expect(mergeInherited(child, undefined)).toEqual({ byGroup: new Map(), extraGroups: [], total: 0 });
+  });
+
   it('reports repeated requirements and specs extended that disagree', () => {
     const storage = parseSpecMarkdown('# Data storage\n\n## Requirements\n\n- Data SHOULD be encrypted at rest.\n\n### Retention\n\n- Data MUST have a retention limit.\n');
     const audit = parseSpecMarkdown('# Audit logging\n\n## Requirements\n\n- Data MUST be encrypted at rest.\n- Every read MUST be logged.\n');
@@ -213,7 +243,7 @@ describe('specs extending other specs', () => {
     expect(inheritanceIssues(child, inheritance).map((i) => [i.message, i.location.anchor])).toEqual([
       ['Requirement 1 repeats a requirement inherited from "Audit logging"', 'requirements'],
       ['Backups: requirement 1 repeats a requirement inherited from "Data storage"', 'requirements'],
-      ['"Data storage" (SHOULD) and "Audit logging" (MUST) disagree on "Data SHOULD be encrypted at rest.": the first one applies, restate it here to settle it', 'inherited'],
+      ['"Data storage" (SHOULD) and "Audit logging" (MUST) disagree on "Data SHOULD be encrypted at rest.": the first one applies, restate it here to settle it', 'requirements'],
     ]);
     // Settling it in the child, by overriding it, ends the disagreement.
     const settled = parseSpecMarkdown('# Persistent storage\n\n## Requirements\n\n- Data MUST be encrypted at rest.\n');

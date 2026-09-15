@@ -28,6 +28,8 @@ export function useSpec(): SpecEditorValue {
 
 export const anchorId = (anchor: SpecAnchor) => `spec-${anchor}`;
 export const groupId = (group: number) => `spec-group-${group}`;
+/** A group only the specs extended have, in the order `mergeInherited` met them. */
+export const inheritedGroupId = (group: number) => `spec-inherited-group-${group}`;
 /** Focus keys: "main-2" is the third requirement of the ungrouped list, "g0-add" the add box of the first group. */
 export const listKey = (group: ListRef) => (group === null ? 'main' : `g${group}`);
 /** Focus key of an example: "main-2-ex-0" is the first example of the third requirement. */

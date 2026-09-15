@@ -209,12 +209,14 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 | Requirements | A `## Requirements` section: the BCP 14 conformance sentence of RFC 8174 (can be turned off), a list of requirements, and optional `###` groups (e.g. Security) with their own lists. A group is written as soon as it is named, even empty, and stays until it is deleted; the section goes when it has no requirement or group left |
 | Examples | A nested list under a requirement, each item written `- Example: <one concrete case>` |
 
+Inherited requirements are never written to the file: they stay in the spec that states them and the form reads them from there.
+
 **Requirements** are sentences with a key word in capitals: **MUST** / **MUST NOT** (absolute), **SHOULD** / **SHOULD NOT** (recommended, exceptions need a valid reason), **MAY** (optional). The other RFC 2119 words are read as their equivalent (SHALL and REQUIRED as MUST, SHALL NOT as MUST NOT, RECOMMENDED as SHOULD, NOT RECOMMENDED as SHOULD NOT, OPTIONAL as MAY) and kept as written.
 
 - Each row has a **key word picker** next to the sentence: picking a level replaces the key word in the sentence (or a lowercase "must", "should"...). The picker follows what you type.
 - The **add box** takes a full sentence as typed, or composes one: with MUST selected, `Take card payments` becomes `The service MUST take card payments`, reusing the subject of the last requirement (or the title). A preview shows the sentence before it is added.
 - Requirements can be edited in place (Shift+Enter for a second line), reordered, moved to another group, and deleted. Deleting the text of a requirement and leaving it removes it. Groups can be added (empty, then filled by adding requirements or moving existing ones into them), renamed, reordered and deleted with their content.
-- The Requirements header counts requirements per key word and their examples; the outline on the left shows the groups.
+- The Requirements header counts requirements per key word, their examples and the inherited ones; the outline on the left shows the groups, each with the number of requirements written here and, after a `+`, the number it inherits.
 
 ### Example scenarios
 
@@ -237,9 +239,10 @@ A spec can **extend** one or several more general ones, so that shared rules are
 Extends: [Data storage](./data-storage.spec.md), [Audit logging](./audit-logging.spec.md)
 ```
 
-- Every spec inherited from — the specs extended, in the order they are written, then the specs *those* extend, and so on — is shown in an **Inherited requirements** section, read-only, grouped by the spec that states them, with their own examples and a link to open it. They are edited where they are written. A spec reached through two different parents is listed once.
+- Every spec inherited from — the specs extended, in the order they are written, then the specs *those* extend, and so on — has its requirements shown **in the Requirements section itself**, in the group they belong to: the inherited ones come first in each group, read-only, each naming the spec it comes from with a link to open it, then the requirements this spec writes itself. A spec reached through two different parents is listed once.
+- A group that only the specs extended have is shown after the groups of this spec, marked *inherited*; adding a requirement to it creates the group here with that requirement. Groups are matched by name, whatever their case.
 - A requirement of the child that says the same thing as an inherited one with **another key word overrides it** (`Data SHOULD be encrypted at rest` becoming `Data MUST be encrypted at rest`): the inherited one is struck through and marked *overridden here*. Restating an inherited requirement without changing its key word is reported as a problem instead: it applies already.
-- When two specs extended **disagree** (the same requirement at two levels), the one listed first applies, and the form says so; restating the requirement in the child settles it.
+- When two specs extended **disagree** (the same requirement at two levels), the one listed first applies: the other is struck through and marked as overridden by it, and the form reports the disagreement so the child can settle it by restating the requirement.
 - A missing file, a path outside the workspace folder, a spec extending one that extends it back, and chains deeper than 10 specs are reported in the form.
 
 **Kept as written:** front matter, other `##` sections (listed with a link to their line in the text editor), notes or tables in the section or a group (they move and are deleted with their group), the list style (`-`, `*`, numbered) and task boxes (`- [x]`). Lines of the description or context that would start a `#`/`##` heading are escaped (`\##`), and a code block left open is closed, so typed text never breaks the structure.

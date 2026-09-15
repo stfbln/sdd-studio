@@ -3,7 +3,7 @@ import { normalizeTitle, type ListRef } from './edits';
 import { KEYWORDS, lowercaseKeyword, subjectOf, type Keyword } from './keywords';
 import { parseSpecMarkdown, type Requirement, type SpecModel } from './parse';
 
-export type SpecAnchor = 'overview' | 'inherited' | 'context' | 'requirements';
+export type SpecAnchor = 'overview' | 'context' | 'requirements';
 
 /** Where a problem is shown in the form: a part of the page, one requirement, or one of its examples. */
 export interface SpecLocation {

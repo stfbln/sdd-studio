@@ -96,7 +96,63 @@ export function inheritedByKey(inheritance: SpecInheritance | undefined): Map<st
   return byKey;
 }
 
-const specName = (spec: InheritedSpec) => spec.title || spec.path;
+export const specName = (spec: InheritedSpec) => spec.title || spec.path;
+
+/** Requirements are grouped by the name of their `###` group, whatever its case; "" is the list without a group. */
+export const groupKey = (name: string | null | undefined) => (name ?? '').trim().toLowerCase();
+
+/** An inherited requirement as the form shows it, in the list of the group it belongs to. */
+export interface InheritedEntry {
+  spec: InheritedSpec;
+  requirement: InheritedRequirement;
+  /** Name of the spec the one stating it is extended by, when it is not the edited spec. */
+  through?: string;
+  /** Set when a nearer requirement says the same thing: the spec stating it ("" for the edited one) and its key word. */
+  overridden?: { by: string; keyword?: Keyword };
+}
+
+export interface MergedInheritance {
+  /** Inherited requirements by group key, closest spec first; "" holds the ones written without a group. */
+  byGroup: Map<string, InheritedEntry[]>;
+  /** Groups only the specs extended have, as they are spelled there, in the order they are met. */
+  extraGroups: string[];
+  total: number;
+}
+
+/**
+ * The inherited requirements laid out like the Requirements section of the form: per group, closest
+ * spec first, each marked with what overrides it (a requirement of the edited spec, or of a spec
+ * extended before the one stating it).
+ */
+export function mergeInherited(model: SpecModel, inheritance: SpecInheritance | undefined): MergedInheritance {
+  const byGroup = new Map<string, InheritedEntry[]>();
+  const extraGroups: string[] = [];
+  const ownGroups = new Set((model.requirements?.groups ?? []).map((group) => groupKey(group.heading.text)));
+  const own = new Map(allRequirements(model).map(({ item }) => [overrideKey(item.text), item]));
+  const applied = new Map<string, InheritedEntry>();
+  const names = new Map((inheritance?.chain ?? []).map((spec) => [spec.path, specName(spec)]));
+  let total = 0;
+
+  for (const spec of inheritance?.chain ?? []) {
+    for (const requirement of spec.requirements) {
+      const entry: InheritedEntry = { spec, requirement, ...(spec.via ? { through: names.get(spec.via) ?? spec.via } : {}) };
+      const sentence = overrideKey(requirement.text);
+      const ownItem = own.get(sentence);
+      const closer = applied.get(sentence);
+      if (ownItem) entry.overridden = { by: '', keyword: ownItem.keyword };
+      else if (closer) entry.overridden = { by: specName(closer.spec), keyword: closer.requirement.keyword };
+      else applied.set(sentence, entry);
+
+      const key = groupKey(requirement.group);
+      const entries = byGroup.get(key);
+      if (entries) entries.push(entry);
+      else byGroup.set(key, [entry]);
+      if (key && !ownGroups.has(key) && !extraGroups.some((name) => groupKey(name) === key)) extraGroups.push(requirement.group ?? '');
+      total++;
+    }
+  }
+  return { byGroup, extraGroups, total };
+}
 
 /** Problems the file alone cannot show: specs that cannot be read, requirements already inherited, and parents that disagree. */
 export function inheritanceIssues(model: SpecModel, inheritance: SpecInheritance | undefined): SpecIssue[] {
@@ -129,7 +185,7 @@ export function inheritanceIssues(model: SpecModel, inheritance: SpecInheritance
     issues.push({
       severity: 'warning',
       message: `"${specName(found[0].spec)}" (${found[0].requirement.keyword ?? 'no key word'}) and "${specName(other.spec)}" (${other.requirement.keyword ?? 'no key word'}) disagree on "${found[0].requirement.text.replace(/\s+/g, ' ')}": the first one applies, restate it here to settle it`,
-      location: { anchor: 'inherited' },
+      location: { anchor: 'requirements' },
     });
   }
   return issues;

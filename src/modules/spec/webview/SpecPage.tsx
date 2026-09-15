@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { dirOf, relativePath } from '../../../shared/files';
 import { AutoTextarea } from '../../../webview/components/AutoTextarea';
 import { IconButton } from '../../../webview/components/IconButton';
@@ -6,11 +6,11 @@ import { requestFocus } from '../../../webview/focus';
 import { ProblemsList } from '../../../webview/structured/EditorFrame';
 import { Field, KeyInput, Section } from '../../../webview/structured/fields';
 import { listOf, normalizeBlock, normalizeExample, normalizeRequirement, normalizeTitle, type ListRef } from '../core/edits';
-import { overrideKey, parentPath } from '../core/inherit';
+import { groupKey, mergeInherited, parentPath, specName, type InheritedEntry } from '../core/inherit';
 import { composeRequirement, CONFORMANCE_NOTICE, findKeyword, KEYWORD_MEANINGS, KEYWORDS, withKeyword, type Keyword } from '../core/keywords';
 import type { Example, Heading, Requirement } from '../core/parse';
 import { allRequirements, defaultSubject, exampleCount, keywordCounts, plural } from '../core/summary';
-import { anchorId, exampleKey, goTo, groupId, listKey, useDraft, useSpec } from './state';
+import { anchorId, exampleKey, goTo, groupId, inheritedGroupId, listKey, useDraft, useSpec } from './state';
 
 export const keywordClass = (keyword: string | undefined) => (keyword ? `kw kw-${keyword.toLowerCase().replace(' ', '-')}` : 'kw kw-none');
 
@@ -143,71 +143,58 @@ function OverviewSection() {
   );
 }
 
-/** Requirements of the specs this one extends: read-only, with the ones it overrides marked. */
-function InheritedSection() {
-  const { model, context, openFile } = useSpec();
-  const chain = context?.inheritance.chain ?? [];
-  const problems = context?.inheritance.problems ?? [];
-  if (!model.extends && !chain.length) return null;
-  const own = new Map(allRequirements(model).map(({ item }) => [overrideKey(item.text), item]));
-  const total = chain.reduce((count, spec) => count + spec.requirements.length, 0);
+/** One inherited requirement, shown read-only above the requirements of this spec in its group. */
+function InheritedRow({ entry }: { entry: InheritedEntry }) {
+  const { openFile } = useSpec();
+  const { spec, requirement, overridden, through } = entry;
   return (
-    <div id={anchorId('inherited')}>
-      <Section title="Inherited requirements" icon="type-hierarchy" count={total}>
-        <p className="muted small">
-          Apply to this spec as well, and are edited in the spec that states them. Restate one here only to override it with another key word. Where two of these
-          specs disagree, the one listed first applies.
-        </p>
-        {problems.map((problem) => (
-          <p key={problem} className="notice small">
-            <span className="codicon codicon-warning" aria-hidden="true" /> {problem}
-          </p>
-        ))}
-        {chain.map((spec) => (
-          <div key={spec.path} className="inherited-spec">
-            <header className="inherited-header">
-              <span className="codicon codicon-book" aria-hidden="true" />
-              <button type="button" className="link-button" title={spec.path} onClick={() => openFile(spec.path)}>
-                {spec.title || spec.path}
-              </button>
-              <span className="op-label muted">{spec.via ? `extended by ${chain.find((s) => s.path === spec.via)?.title || spec.via}` : 'extended by this spec'}</span>
-              <span className="count">{spec.requirements.length}</span>
-            </header>
-            {spec.requirements.length === 0 ? (
-              <p className="muted small">No requirements.</p>
-            ) : (
-              <ol className="requirement-list inherited-list">
-                {spec.requirements.map((requirement, index) => {
-                  const override = own.get(overrideKey(requirement.text));
-                  return (
-                    <li key={index} className="inherited-row">
-                      <span className={`kind-badge ${keywordClass(requirement.keyword)}`} title={requirement.keyword ? KEYWORD_MEANINGS[requirement.keyword] : 'No RFC 2119 key word in capitals'}>
-                        {requirement.keyword ?? '—'}
-                      </span>
-                      <div className="inherited-text">
-                        <span className={override ? 'overridden' : ''}>{requirement.text}</span>
-                        {requirement.group && <span className="op-label muted">{requirement.group}</span>}
-                        {override && <span className="op-label">overridden here: {override.keyword ?? 'no key word'}</span>}
-                        {requirement.examples.length > 0 && (
-                          <ul className="example-list">
-                            {requirement.examples.map((example, position) => (
-                              <li key={position} className="example-row read-only">
-                                <span className="example-label">Example</span>
-                                <span>{example}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    </li>
-                  );
-                })}
-              </ol>
-            )}
-          </div>
-        ))}
-      </Section>
-    </div>
+    <li className="requirement-row inherited-row">
+      <span className="requirement-number" aria-hidden="true">
+        <span className="codicon codicon-type-hierarchy-super" title={`Inherited from ${specName(spec)}`} />
+      </span>
+      <span
+        className={`kind-badge ${keywordClass(requirement.keyword)}`}
+        title={requirement.keyword ? KEYWORD_MEANINGS[requirement.keyword] : 'No RFC 2119 key word in capitals'}
+      >
+        {requirement.keyword ?? '—'}
+      </span>
+      <div className="inherited-text">
+        <span className={`sentence ${overridden ? 'overridden' : ''}`}>{requirement.text}</span>
+        <span className="inherited-source">
+          from
+          <button type="button" className="link-button" title={spec.path} onClick={() => openFile(spec.path)}>
+            {specName(spec)}
+          </button>
+          {through && <span className="muted">(through {through})</span>}
+          {overridden && (
+            <span className="op-label">
+              overridden {overridden.by ? `by ${overridden.by}` : 'here'}: {overridden.keyword ?? 'no key word'}
+            </span>
+          )}
+        </span>
+        {requirement.examples.length > 0 && (
+          <ul className="example-list">
+            {requirement.examples.map((example, position) => (
+              <li key={position} className="example-row read-only">
+                <span className="example-label">Example</span>
+                <span className="sentence">{example}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function InheritedRows({ entries }: { entries: InheritedEntry[] }) {
+  if (!entries.length) return null;
+  return (
+    <ol className="requirement-list inherited-list">
+      {entries.map((entry, index) => (
+        <InheritedRow key={index} entry={entry} />
+      ))}
+    </ol>
   );
 }
 
@@ -450,7 +437,8 @@ function AddRequirement({ focusKey, onAdd }: { focusKey: string; onAdd(text: str
   );
 }
 
-function RequirementList({ group }: { group: ListRef }) {
+/** The inherited requirements of a list, then the ones written in this spec, then the add box. */
+function RequirementList({ group, inherited }: { group: ListRef; inherited: InheritedEntry[] }) {
   const { model, edit } = useSpec();
   const list = listOf(model, group);
   const items = list?.items ?? [];
@@ -462,9 +450,10 @@ function RequirementList({ group }: { group: ListRef }) {
           <TextLink heading={model.requirements!.groups[group].heading} label="show in text" />.
         </p>
       )}
+      <InheritedRows entries={inherited} />
       {!items.length && group !== null && (
         <p className="muted small empty-group">
-          No requirements yet: add one below, or move one here with the group picker of a requirement.
+          {inherited.length ? 'Nothing of its own yet: ' : 'No requirements yet: '}add one below, or move one here with the group picker of a requirement.
         </p>
       )}
       {items.length > 0 && (
@@ -479,7 +468,24 @@ function RequirementList({ group }: { group: ListRef }) {
   );
 }
 
-function GroupBlock({ group }: { group: number }) {
+/** A group only the specs extended have: its requirements are read-only until this spec adds one of its own. */
+function InheritedGroupBlock({ name, entries, index }: { name: string; entries: InheritedEntry[]; index: number }) {
+  const { edit } = useSpec();
+  return (
+    <div id={inheritedGroupId(index)} className="requirement-group inherited-group">
+      <header className="requirement-group-header">
+        <span className="codicon codicon-symbol-namespace" aria-hidden="true" />
+        <span className="group-name inherited-name">{name}</span>
+        <span className="op-label muted">inherited</span>
+        <span className="count">{entries.length}</span>
+      </header>
+      <InheritedRows entries={entries} />
+      <AddRequirement focusKey={`i${index}`} onAdd={(text) => edit({ op: 'addGroup', name, text })} />
+    </div>
+  );
+}
+
+function GroupBlock({ group, inherited }: { group: number; inherited: InheritedEntry[] }) {
   const { model, edit } = useSpec();
   const groups = model.requirements!.groups;
   const { heading, items, otherContent } = groups[group];
@@ -513,7 +519,7 @@ function GroupBlock({ group }: { group: number }) {
           <IconButton icon="trash" label={content ? `Delete group with ${content}` : 'Delete group'} onClick={() => edit({ op: 'deleteGroup', group })} />
         </span>
       </header>
-      <RequirementList group={group} />
+      <RequirementList group={group} inherited={inherited} />
     </div>
   );
 }
@@ -553,12 +559,15 @@ function NewGroup({ onDone }: { onDone(): void }) {
 }
 
 function RequirementsSection() {
-  const { model, edit } = useSpec();
+  const { model, context, edit } = useSpec();
   const [creating, setCreating] = useState(false);
   const requirements = model.requirements;
   const counts = keywordCounts(model);
   const examples = exampleCount(model);
   const groups = requirements?.groups ?? [];
+  const inherited = useMemo(() => mergeInherited(model, context?.inheritance), [model, context]);
+  const inheritedIn = (name: string | null) => inherited.byGroup.get(groupKey(name)) ?? [];
+  const problems = context?.inheritance.problems ?? [];
   return (
     <div id={anchorId('requirements')}>
       <Section
@@ -572,6 +581,7 @@ function RequirementsSection() {
             </span>
           )),
           ...(examples ? [<span key="examples" className="kind-badge" title="Example scenarios listed under the requirements">{plural(examples, 'example')}</span>] : []),
+          ...(inherited.total ? [<span key="inherited" className="kind-badge inherited-badge" title="Requirements of the specs this one extends">{inherited.total} inherited</span>] : []),
         ]}
       >
         <p className="muted small">
@@ -583,6 +593,17 @@ function RequirementsSection() {
           exceptions, <b>MAY</b> for options. Enter in a requirement moves to the add box, Shift+Enter starts a new line. The <span className="codicon codicon-beaker" aria-hidden="true" />{' '}
           button lists example scenarios under a requirement: one concrete case each, with real values.
         </p>
+        {inherited.total > 0 && (
+          <p className="muted small">
+            <span className="codicon codicon-type-hierarchy-super" aria-hidden="true" /> The requirements of the specs this one extends are listed first in each
+            group, read-only: they apply here too and are edited in the spec that states them. Writing the same sentence with another key word overrides one.
+          </p>
+        )}
+        {problems.map((problem) => (
+          <p key={problem} className="notice small">
+            <span className="codicon codicon-warning" aria-hidden="true" /> {problem}
+          </p>
+        ))}
         <label className="checkbox" title={`Written at the start of the section:\n${CONFORMANCE_NOTICE}`}>
           <input
             type="checkbox"
@@ -599,11 +620,14 @@ function RequirementsSection() {
           </p>
         )}
         <div className="requirement-group main-list">
-          {groups.length > 0 && <div className="muted small">Without group</div>}
-          <RequirementList group={null} />
+          {(groups.length > 0 || inherited.extraGroups.length > 0) && <div className="muted small">Without group</div>}
+          <RequirementList group={null} inherited={inheritedIn(null)} />
         </div>
-        {groups.map((_, i) => (
-          <GroupBlock key={i} group={i} />
+        {groups.map((group, i) => (
+          <GroupBlock key={i} group={i} inherited={inheritedIn(group.heading.text)} />
+        ))}
+        {inherited.extraGroups.map((name, i) => (
+          <InheritedGroupBlock key={name} name={name} entries={inheritedIn(name)} index={i} />
         ))}
         {creating ? (
           <NewGroup onDone={() => setCreating(false)} />
@@ -624,7 +648,6 @@ export function SpecPage() {
     <div className="page spec-page">
       {issues.length > 0 && <ProblemsList issues={issues} onNavigate={goTo} />}
       <OverviewSection />
-      <InheritedSection />
       <ContextSection />
       <RequirementsSection />
       {others.length > 0 && (
