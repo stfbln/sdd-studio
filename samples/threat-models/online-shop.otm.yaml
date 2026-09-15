@@ -1,0 +1,169 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/iriusrisk/OpenThreatModel/main/otm_schema.json
+# How to update this file (for people and AI assistants): an Open Threat Model (OTM) file, see
+#   https://github.com/iriusrisk/OpenThreatModel.
+# - Purpose: The threat model: threats, their mitigations and risk, on a security view of the
+#   system. What belongs in other files:
+#   - What exists, where it runs and which data it uses: the catalog. When the threat model and the
+#     catalog disagree on those, the catalog wins.
+#   - Security requirements that do not mitigate a modelled threat: the markdown spec of the entity.
+# - Keep the file valid against the JSON schema of the first line; when you change "otmVersion",
+#   link the schema of that version.
+# - Every trust zone, component, dataflow, asset, threat and mitigation has an id unique in its
+#   list; a component id must not also be a trust zone id.
+# - Items point to each other by id: parent {trustZone: id} or {component: id}, dataflow source and
+#   destination (component or trust zone ids), assets, and threats: [{threat: id, state,
+#   mitigations: [{mitigation: id, state}]}] on components and dataflows.
+# - Software catalog files place networks in trust zones as <path of this file>#<trust zone id>:
+#   when you rename a trust zone id, update those references too.
+# - Keep this header and the existing comments.
+
+# Threat model of the online shop checkout (Open Threat Model 0.2.0).
+otmVersion: 0.2.0
+project:
+  name: Online shop
+  id: online-shop
+  description: Customers browse the catalog and pay for their orders by card.
+  owner: Checkout team
+  ownerContact: checkout@example.com
+  tags:
+    - checkout
+    - pci
+  attributes:
+    cmdbId: SHOP-042
+
+representations:
+  - name: Architecture diagram
+    id: architecture-diagram
+    type: diagram
+    size:
+      width: 1200
+      height: 800
+
+trustZones:
+  - name: Internet
+    id: internet
+    type: internet
+    description: Anything outside our network.
+    risk:
+      trustRating: 10
+  - name: Private network
+    id: private
+    type: private
+    risk:
+      trustRating: 90
+
+components:
+  - name: Browser
+    id: browser
+    type: web-client
+    parent:
+      trustZone: internet
+    representations:
+      - representation: architecture-diagram
+        id: browser-shape
+        position:
+          x: 40
+          y: 60
+        size:
+          width: 120
+          height: 80
+  - name: Shop API
+    id: shop-api
+    type: web-service
+    description: Handles the cart, orders and payments.
+    parent:
+      trustZone: private
+    tags:
+      - node
+    assets:
+      processed:
+        - card-data
+        - customer-data
+    threats:
+      - threat: card-data-leak
+        state: exposed
+        mitigations:
+          - mitigation: tokenize-cards
+            state: required
+      - threat: session-hijacking
+        state: mitigated
+        mitigations:
+          - mitigation: secure-cookies
+            state: implemented
+  - name: Orders database
+    id: orders-db
+    type: database
+    parent:
+      trustZone: private
+    assets:
+      stored:
+        - customer-data
+    threats:
+
+dataflows:
+  - name: Checkout requests
+    id: browser-to-api
+    bidirectional: true
+    source: browser
+    destination: shop-api
+    assets:
+      - card-data
+    threats:
+      - threat: session-hijacking
+        state: mitigated
+        mitigations:
+          - mitigation: secure-cookies
+            state: required
+  - name: Order storage
+    id: api-to-db
+    source: shop-api
+    destination: orders-db
+    assets:
+      - customer-data
+
+assets:
+  - name: Card data
+    id: card-data
+    description: Card numbers and security codes typed at checkout.
+    risk:
+      confidentiality: 100
+      integrity: 90
+      availability: 60
+      comment: PCI DSS scope.
+  - name: Customer data
+    id: customer-data
+    description: Names, addresses and order history.
+    risk:
+      confidentiality: 70
+      integrity: 70
+      availability: 50
+
+threats:
+  - name: Card data leak
+    id: card-data-leak
+    description: An attacker reads card numbers from logs or memory dumps of the API.
+    categories:
+      - Information Disclosure
+    cwes:
+      - CWE-532
+    risk:
+      likelihood: 40
+      likelihoodComment: Needs access to the private network.
+      impact: 100
+      impactComment: Card data exposure means fines and loss of trust.
+  - name: Session hijacking
+    id: session-hijacking
+    cwes:
+      - CWE-384
+    risk:
+      likelihood: 50
+      impact: 70
+
+mitigations:
+  - name: Tokenize cards at the payment provider
+    id: tokenize-cards
+    description: Card numbers never reach our servers.
+    riskReduction: 90
+  - name: Secure, HTTP-only cookies
+    id: secure-cookies
+    riskReduction: 70

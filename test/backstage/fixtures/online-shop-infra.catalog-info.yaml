@@ -1,0 +1,266 @@
+# Software catalog of the online shop (Backstage format).
+# Register this file in Backstage, or open it with SDD Studio to edit it as a form.
+apiVersion: backstage.io/v1alpha1
+kind: Domain
+metadata:
+  name: commerce
+  title: Commerce
+  description: Everything customers use to find and buy products.
+spec:
+  owner: checkout-team
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: online-shop
+  title: Online shop
+  description: Customers browse the catalog and pay for their orders by card.
+  tags:
+    - checkout
+    - pci
+  annotations:
+    sdd-studio/threat-models: ../threat-models/online-shop.otm.yaml
+spec:
+  owner: checkout-team
+  domain: commerce
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: shop-api
+  title: Shop API
+  description: Orders, payments and the product catalog.
+  annotations:
+    sdd-studio/specs: ../specs/payment-service.spec.md, ../features/shop.feature
+    sdd-studio/repository: shop-repo
+    sdd-studio/repository-path: services/shop-api
+    sdd-studio/deployed-on: prod-eks-cluster
+    backstage.io/source-location: url:https://gitlab.com/acme/shop/-/tree/main/services/shop-api/
+spec:
+  type: service
+  lifecycle: production
+  owner: checkout-team
+  system: online-shop
+  providesApis:
+    - petstore-api
+    - order-events
+  dependsOn:
+    - resource:orders-db
+    - resource:card-data
+    - resource:private
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: deploy-cli
+  title: Deploy CLI
+  description: Command line tool deploying the shop to the clusters.
+  annotations:
+    sdd-studio/repository: shop-repo
+    sdd-studio/repository-path: tools/deploy
+    backstage.io/source-location: url:https://gitlab.com/acme/shop/-/tree/main/tools/deploy/
+spec:
+  type: cli
+  lifecycle: experimental
+  owner: platform-team
+  system: online-shop
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: petstore-api
+  title: Petstore API
+spec:
+  type: openapi
+  lifecycle: production
+  owner: checkout-team
+  system: online-shop
+  definition:
+    $text: ../api/petstore.openapi.yaml
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: order-events
+  title: Order events
+spec:
+  type: asyncapi
+  lifecycle: production
+  owner: checkout-team
+  system: online-shop
+  definition:
+    $text: ../api/order-events.asyncapi.yaml
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: orders-db
+  title: Orders database
+  annotations:
+    sdd-studio/deployed-on: db-host
+spec:
+  type: database
+  owner: checkout-team
+  system: online-shop
+  dependsOn:
+    - resource:private
+    - resource:postgres-image
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: card-data
+  title: Card data
+  description: Card numbers and expiry dates, tokenized before storage.
+  labels:
+    sdd-studio/data-classification: restricted
+spec:
+  type: data-asset
+  owner: checkout-team
+  system: online-shop
+  dependsOn:
+    - resource:orders-db
+---
+# Networks stand for the trust zones of the threat model.
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: internet
+  title: Internet
+  description: Anything outside our network.
+  annotations:
+    sdd-studio/trust-zone: ../threat-models/online-shop.otm.yaml#internet
+spec:
+  type: network
+  owner: platform-team
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: private
+  title: Private network
+  annotations:
+    sdd-studio/trust-zone: ../threat-models/online-shop.otm.yaml#private
+    sdd-studio/cidr: 10.20.0.0/16
+spec:
+  type: network
+  owner: platform-team
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: shop-repo
+  title: Shop repository
+  description: Monorepo of the shop services and tools.
+  annotations:
+    sdd-studio/provider: gitlab
+    sdd-studio/repository-url: https://gitlab.com/acme/shop
+    sdd-studio/default-branch: main
+spec:
+  type: repository
+  owner: checkout-team
+  system: online-shop
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: shop-api-image
+  title: Shop API image
+  annotations:
+    sdd-studio/artifact-type: container-image
+    sdd-studio/purl: pkg:docker/acme/shop-api
+    sdd-studio/produced-by: shop-api
+    sdd-studio/repository: shop-repo
+    sdd-studio/repository-path: services/shop-api
+    backstage.io/source-location: url:https://gitlab.com/acme/shop/-/tree/main/services/shop-api/
+spec:
+  type: artifact
+  owner: checkout-team
+  system: online-shop
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: postgres-image
+  title: PostgreSQL image
+  annotations:
+    sdd-studio/artifact-type: container-image
+    sdd-studio/purl: pkg:docker/library/postgres@16
+    sdd-studio/supplier: PostgreSQL Global Development Group
+spec:
+  type: artifact
+  owner: platform-team
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: deploy-cli-image
+  title: Deploy CLI image
+  annotations:
+    sdd-studio/artifact-type: container-image
+    sdd-studio/purl: pkg:docker/acme/deploy-cli
+    sdd-studio/produced-by: resource:shop-repo
+spec:
+  type: artifact
+  owner: platform-team
+  system: online-shop
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: prod-eks-cluster
+  title: Prod EKS cluster
+  annotations:
+    sdd-studio/site: aws-us-east-1
+spec:
+  type: platform
+  owner: platform-team
+  system: online-shop
+  dependsOn:
+    - resource:private
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: db-host
+  title: Orders DB host
+  annotations:
+    sdd-studio/site: aws-us-east-1
+spec:
+  type: infrastructure
+  owner: platform-team
+  system: online-shop
+  dependsOn:
+    - resource:private
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: aws-us-east-1
+  title: AWS us-east-1
+  annotations:
+    sdd-studio/cloud-provider: aws
+    sdd-studio/region: us-east-1
+spec:
+  type: site
+  owner: platform-team
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: checkout-team
+  title: Checkout team
+spec:
+  type: team
+  profile:
+    email: checkout@example.com
+  children: []
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: platform-team
+  title: Platform team
+spec:
+  type: team
+  children: []

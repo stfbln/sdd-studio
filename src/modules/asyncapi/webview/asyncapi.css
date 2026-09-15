@@ -1,0 +1,36 @@
+/* AsyncAPI-specific styles; layout and forms come from webview/structured/structured.css. */
+
+.badge-send { --badge-color: #3c9a50; }
+.badge-receive { --badge-color: #2f7fd6; }
+.badge-publish { --badge-color: #c77c11; }
+.badge-subscribe { --badge-color: #0f8f84; }
+.badge-unknown { --badge-color: #d14343; }
+
+.servers-table .table-head,
+.servers-table .table-row {
+  grid-template-columns: minmax(8ch, 1fr) minmax(14ch, 2fr) 9em minmax(10ch, 2fr) 24px;
+}
+
+.servers-table.v3 .table-head,
+.servers-table.v3 .table-row {
+  grid-template-columns: minmax(8ch, 1fr) minmax(14ch, 2fr) minmax(6ch, 1fr) 9em minmax(10ch, 2fr) 24px;
+}
+
+.warning-text {
+  color: var(--sdd-warning);
+}
+
+.nav-hint {
+  padding: 4px 8px;
+}
+
+@media (max-width: 720px) {
+  .servers-table .table-head {
+    display: none;
+  }
+
+  .servers-table .table-row,
+  .servers-table.v3 .table-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}

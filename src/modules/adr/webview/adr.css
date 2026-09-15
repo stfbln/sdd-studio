@@ -1,0 +1,168 @@
+/* ADR styles; layout and forms come from webview/structured/structured.css. */
+
+.adr-page .title-input {
+  width: 100%;
+}
+
+.bullet-list,
+.option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bullet-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bullet-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bullet-add .input:not(:focus):placeholder-shown {
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--sdd-border);
+}
+
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.type-select {
+  width: 7em;
+  flex-shrink: 0;
+}
+
+.option-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--sdd-border);
+  border-radius: var(--sdd-radius);
+}
+
+.option-row-main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.option-title {
+  flex: 1;
+  font-weight: 600;
+}
+
+/* Options comparison matrix -------------------------------------------------------------------------- */
+
+.matrix-table {
+  display: grid;
+  gap: 1px;
+  background: var(--sdd-border);
+  border: 1px solid var(--sdd-border);
+  border-radius: var(--sdd-radius);
+  overflow: hidden;
+}
+
+.matrix-head,
+.matrix-row-label,
+.matrix-cell {
+  padding: 6px 8px;
+  background: var(--sdd-card-bg);
+}
+
+.matrix-head {
+  font-size: 0.85em;
+  font-weight: 600;
+  color: var(--sdd-muted);
+}
+
+.matrix-corner {
+  background: var(--vscode-editor-background);
+}
+
+.matrix-row-label {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+}
+
+.matrix-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rating-select {
+  font-weight: 700;
+}
+
+.rating-select.rating-meets {
+  color: var(--sdd-success, #2e8540);
+}
+
+.rating-select.rating-partial {
+  color: var(--sdd-warning);
+}
+
+.rating-select.rating-fails {
+  color: var(--sdd-error);
+}
+
+.note-input {
+  font-size: 0.9em;
+}
+
+/* Decision outcome ------------------------------------------------------------------------------------ */
+
+.subsection {
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--sdd-border);
+}
+
+.subsection h3 {
+  margin: 0 0 6px;
+  font-size: 0.95em;
+  font-weight: 600;
+}
+
+/* Pros and cons ---------------------------------------------------------------------------------------- */
+
+.procon-card {
+  padding: 8px 0;
+}
+
+.procon-card + .procon-card {
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--sdd-border);
+}
+
+.procon-card h3 {
+  margin: 0 0 6px;
+  font-size: 0.95em;
+  font-weight: 600;
+}
+
+.other-sections {
+  margin: 0;
+  padding-left: 18px;
+}
+
+@container (max-width: 560px) {
+  .option-row-main {
+    flex-wrap: wrap;
+  }
+}

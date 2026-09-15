@@ -1,0 +1,446 @@
+/* Layout ------------------------------------------------------------------ */
+
+.sticky-top {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--vscode-editor-background);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sdd-gap);
+  padding: 6px 16px;
+  background: var(--vscode-editor-background);
+  border-bottom: 1px solid var(--sdd-border);
+}
+
+.toolbar-title,
+.toolbar-actions,
+.language {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.file-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.language .keyword-select {
+  max-width: 180px;
+}
+
+.editor {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 12px 16px 64px;
+}
+
+.editor.readonly {
+  opacity: 0.55;
+}
+
+.loading,
+.empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--sdd-muted);
+}
+
+/* Cards ------------------------------------------------------------------- */
+
+.card {
+  background: var(--sdd-card-bg);
+  border: 1px solid var(--sdd-border);
+  border-left: 3px solid var(--card-accent, var(--sdd-border));
+  border-radius: var(--sdd-radius);
+  margin-bottom: 10px;
+}
+
+.feature-card {
+  --card-accent: var(--vscode-textLink-foreground);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+}
+
+.card-scenario {
+  --card-accent: var(--vscode-charts-blue, #3794ff);
+}
+
+.card-outline {
+  --card-accent: var(--vscode-charts-purple, #b180d7);
+}
+
+.card-background {
+  --card-accent: var(--vscode-charts-yellow, #cca700);
+}
+
+.card-rule {
+  --card-accent: var(--vscode-charts-green, #89d185);
+  background: transparent;
+}
+
+.card-rule > .card-body > .children {
+  margin-top: 6px;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 6px 4px;
+}
+
+.card-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.card-summary {
+  white-space: nowrap;
+  font-size: 0.9em;
+}
+
+.card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 12px 10px 32px;
+}
+
+.feature-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.keyword-badge {
+  flex-shrink: 0;
+  font-weight: 600;
+  color: var(--vscode-symbolIcon-keywordForeground, var(--vscode-textLink-foreground));
+}
+
+select.keyword-badge {
+  background: transparent;
+  border-color: transparent;
+}
+
+select.keyword-badge:hover {
+  border-color: var(--sdd-border);
+}
+
+.title-input {
+  flex: 1;
+  font-size: 1.35em;
+  font-weight: 600;
+}
+
+.name-input {
+  flex: 1;
+  font-weight: 600;
+}
+
+.description {
+  color: var(--vscode-input-foreground);
+}
+
+.add-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 0 8px;
+}
+
+.notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: var(--sdd-radius);
+  background: var(--vscode-textBlockQuote-background);
+  color: var(--sdd-muted);
+}
+
+.notice-warning {
+  color: var(--vscode-foreground);
+  background: var(--vscode-inputValidation-warningBackground, rgba(204, 167, 0, 0.15));
+  border: 1px solid var(--vscode-inputValidation-warningBorder, var(--sdd-warning));
+}
+
+.notice-warning > .codicon {
+  color: var(--sdd-warning);
+}
+
+/* Steps ------------------------------------------------------------------- */
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.step-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.step-keyword {
+  width: 7.5em;
+  flex-shrink: 0;
+  font-weight: 600;
+  color: var(--step-color, var(--vscode-symbolIcon-keywordForeground));
+}
+
+.step-given {
+  --step-color: var(--vscode-charts-yellow, #cca700);
+}
+
+.step-when {
+  --step-color: var(--vscode-charts-orange, #d18616);
+}
+
+.step-then {
+  --step-color: var(--vscode-charts-green, #89d185);
+}
+
+.step-and .step-keyword,
+.step-but .step-keyword,
+.step-any .step-keyword {
+  font-weight: normal;
+}
+
+.step-argument {
+  margin: 2px 0 6px calc(7.5em + 8px);
+}
+
+.docstring {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 8px;
+  border-left: 2px solid var(--sdd-border);
+}
+
+.docstring-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.steps-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.parameter-prompt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 6px calc(7.5em + 8px);
+  padding: 6px 8px;
+  border-radius: var(--sdd-radius);
+  border: 1px solid var(--vscode-focusBorder);
+  background: var(--vscode-editorWidget-background);
+}
+
+.parameter-prompt .input {
+  width: 14ch;
+  font-family: var(--vscode-editor-font-family);
+}
+
+.param-token {
+  font-family: var(--vscode-editor-font-family);
+  color: var(--vscode-charts-purple, #b180d7);
+}
+
+.param-list {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-weight: normal;
+}
+
+mark.param-value {
+  font-family: var(--vscode-editor-font-family);
+  padding: 0 3px;
+  border-radius: 3px;
+  color: inherit;
+  background: var(--vscode-editor-findMatchHighlightBackground, rgba(234, 92, 0, 0.33));
+}
+
+/* Examples ---------------------------------------------------------------- */
+
+.examples-section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--sdd-border);
+}
+
+.examples-section > * {
+  max-width: 100%;
+}
+
+.section-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.examples-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.examples-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.examples-name {
+  width: 22ch;
+}
+
+.preview summary {
+  cursor: pointer;
+  color: var(--vscode-textLink-foreground);
+}
+
+.preview-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.preview-item {
+  padding: 6px 8px;
+  border-radius: var(--sdd-radius);
+  background: var(--vscode-textBlockQuote-background);
+}
+
+.preview-title {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.preview-step .keyword {
+  font-weight: 600;
+  color: var(--vscode-symbolIcon-keywordForeground);
+}
+
+/* Errors ------------------------------------------------------------------ */
+
+.error-panel {
+  margin: 16px;
+  padding: 10px 12px;
+  border-radius: var(--sdd-radius);
+  border: 1px solid var(--vscode-inputValidation-errorBorder, var(--sdd-error));
+  background: var(--vscode-inputValidation-errorBackground, rgba(241, 76, 76, 0.1));
+}
+
+.error-panel.compact {
+  margin: 8px 16px;
+  max-height: 40vh;
+  overflow: auto;
+}
+
+.error-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.error-title > .codicon {
+  color: var(--sdd-error);
+}
+
+.error-panel ul {
+  margin: 8px 0 0;
+  padding-left: 24px;
+}
+
+@media (max-width: 600px) {
+  .card-body {
+    padding-left: 12px;
+  }
+
+  .step-argument,
+  .parameter-prompt {
+    margin-left: 0;
+  }
+
+  .step-keyword {
+    width: 5.5em;
+  }
+}
+
+/* "Rework with AI" ------------------------------------------------------------------------------------- */
+
+.rework {
+  position: relative;
+}
+
+.rework-menu {
+  position: absolute;
+  z-index: 10;
+  top: 100%;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 14em;
+  margin-top: 4px;
+  padding: 4px;
+  background: var(--sdd-card-bg);
+  border: 1px solid var(--sdd-border);
+  border-radius: var(--sdd-radius);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.rework-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  background: none;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.rework-item:hover {
+  background: var(--vscode-list-hoverBackground);
+}

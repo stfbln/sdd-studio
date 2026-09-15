@@ -1,0 +1,118 @@
+# yaml-language-server: $schema=https://spec.openapis.org/oas/3.0/schema/2024-10-18
+# How to update this file (for people and AI assistants): an OpenAPI 3.0 document, see
+#   https://spec.openapis.org/oas/v3.0.4.html.
+# - Purpose: The contract of an HTTP API. What belongs in other files:
+#   - Owner, lifecycle, system, and which components provide or consume the API: the catalog
+#     (info.title and contact only repeat what the format requires).
+#   - Behaviour shown by examples (workflows, business rules): Gherkin features.
+#   - Quality targets and constraints the format cannot express (latency, availability, rate limit
+#     policies, retention): the markdown spec of the entity.
+#   - Threats and mitigations: the threat model.
+# - Keep the file valid against the JSON schema of the first line; when you change "openapi", link
+#   the schema of that version.
+# - Give every operation a unique operationId and at least one response; declare each {parameter} of
+#   a path as an "in: path" parameter.
+# - Define reusable schemas under components.schemas and use them with $ref:
+#   '#/components/schemas/Name' instead of copying them.
+# - Software catalog files and other specs refer to this file by its path: keep its name and folder.
+# - Keep this header and the existing comments.
+
+# Sample specification for the SDD OpenAPI form editor.
+openapi: 3.0.3
+info:
+  title: Pet Store API
+  version: 1.0.0
+  description: |
+    Manage the pets of the store.
+    Comments in this file are kept when you edit it through the form.
+servers:
+  - url: https://api.petstore.example.com/v1
+    description: Production
+tags:
+  - name: pets
+    description: Everything about pets
+paths:
+  /pets:
+    get:
+      summary: List pets
+      operationId: listPets
+      tags: [pets]
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of pets to return
+          schema:
+            type: integer
+            format: int32
+      responses:
+        200:
+          description: A page of pets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Pet'
+        default:
+          description: Unexpected error
+    post:
+      summary: Create a pet
+      operationId: createPet
+      tags: [pets]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewPet'
+      responses:
+        201:
+          description: Created
+  /pets/{petId}:
+    get:
+      summary: Get a pet
+      operationId: getPet
+      tags: [pets]
+      responses:
+        200:
+          description: The pet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pet'
+        404:
+          description: Not found
+      parameters: []
+    parameters:
+      - name: petId
+        in: path
+        schema:
+          type: string
+        required: true
+        description: "The ID of the pet"
+components:
+  schemas:
+    NewPet:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          description: Display name
+        status:
+          type: string
+          enum: [available, pending, sold]
+    Pet:
+      type: object
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+        owner:
+          type: string
+      description: A pet
+      required:
+        - name
+        - status
+        - owner

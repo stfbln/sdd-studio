@@ -1,0 +1,238 @@
+/* Threat model styles; layout and forms come from webview/structured/structured.css. */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.warning-text {
+  color: var(--sdd-warning);
+}
+
+.item-link {
+  text-align: left;
+}
+
+/* Risk values (0 to 100) */
+
+.risk-grid {
+  align-items: start;
+}
+
+.risk-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.risk-range {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--vscode-focusBorder);
+}
+
+.risk-range.unset {
+  opacity: 0.4;
+}
+
+.number-input {
+  width: 6em;
+}
+
+.numbers .number-input {
+  width: 5.5em;
+}
+
+/* References */
+
+.ref-select,
+.link-select {
+  min-width: 12ch;
+  max-width: 100%;
+}
+
+.ref-select.invalid {
+  border-color: var(--sdd-error);
+}
+
+.link-create {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.link-create .input {
+  min-width: 22ch;
+}
+
+/* Threat instances */
+
+.threat-instance {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px;
+  border: 1px solid var(--sdd-border);
+  border-left: 3px solid var(--state-color, var(--sdd-border));
+  border-radius: var(--sdd-radius);
+  background: var(--vscode-editor-background);
+}
+
+.threat-instance:has(.threat-instance-head .state-exposed) {
+  --state-color: var(--sdd-error);
+}
+
+.threat-instance:has(.threat-instance-head .state-mitigated) {
+  --state-color: #3c9a50;
+}
+
+.threat-instance:has(.threat-instance-head .state-partly-mitigated) {
+  --state-color: #c77c11;
+}
+
+.threat-instance-head,
+.mitigation-row,
+.representation-row,
+.attribute-row,
+.use-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.threat-instance-head .ref-select {
+  flex: 1 1 18ch;
+}
+
+.mitigation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 22px;
+}
+
+.mitigation-row .ref-select {
+  flex: 1 1 16ch;
+}
+
+.mitigation-row.add-row > .codicon {
+  color: var(--sdd-muted);
+}
+
+.state-input {
+  width: 16ch;
+}
+
+.state .input {
+  border-left: 3px solid var(--state-color, var(--sdd-border));
+}
+
+.state-badge {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 0.85em;
+  white-space: nowrap;
+  color: var(--vscode-foreground);
+  background: color-mix(in srgb, var(--state-color, #6b7280) 25%, transparent);
+  border: 1px solid var(--state-color, #6b7280);
+}
+
+.state-exposed { --state-color: #d14343; }
+.state-mitigated,
+.state-implemented { --state-color: #3c9a50; }
+.state-partly-mitigated,
+.state-required { --state-color: #c77c11; }
+.state-recommended { --state-color: #2f7fd6; }
+.state-not-applicable,
+.state-rejected { --state-color: #6b7280; }
+
+/* Assets */
+
+.assets-table .table-head,
+.assets-table .table-row {
+  grid-template-columns: minmax(12ch, 1fr) repeat(var(--columns, 1), 7em);
+}
+
+/* Representations and attributes */
+
+.representation-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--sdd-border);
+}
+
+.representation-card:last-of-type {
+  border-bottom: none;
+}
+
+.representation-row > .input:not(.number-input),
+.representation-row > .key-input {
+  flex: 1 1 14ch;
+}
+
+.attribute-row > .key-input {
+  flex: 0 1 22ch;
+}
+
+.attribute-row > .input,
+.attribute-json {
+  flex: 1 1 20ch;
+}
+
+/* Threat register */
+
+.register-table .table-head,
+.register-table .table-row {
+  grid-template-columns: minmax(12ch, 1.2fr) minmax(12ch, 1fr) 9em minmax(12ch, 1.5fr);
+}
+
+.register-table .table-row {
+  padding: 2px 0;
+  border-top: 1px solid var(--sdd-border);
+}
+
+.register-mitigation {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 8px;
+}
+
+@media (max-width: 720px) {
+  .register-table .table-head {
+    display: none;
+  }
+
+  .register-table .table-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Outline: the name wins over the detail (zone, dataflow ends) when space is short. */
+.nav .path-label {
+  flex-shrink: 0;
+  max-width: 75%;
+}
+
+.nav .op-label {
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.size-label {
+  font-size: 0.85em;
+  color: var(--sdd-muted);
+}

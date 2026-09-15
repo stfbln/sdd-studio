@@ -1,0 +1,385 @@
+/* Shared look & feel for SDD webviews, built on VS Code theme variables. */
+
+:root {
+  --sdd-radius: 4px;
+  --sdd-gap: 8px;
+  --sdd-border: var(--vscode-widget-border, var(--vscode-panel-border, rgba(128, 128, 128, 0.35)));
+  --sdd-card-bg: var(--vscode-editorWidget-background, var(--vscode-sideBar-background));
+  --sdd-muted: var(--vscode-descriptionForeground);
+  --sdd-warning: var(--vscode-editorWarning-foreground, #cca700);
+  --sdd-error: var(--vscode-errorForeground, #f14c4c);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  color: var(--vscode-foreground);
+  background: var(--vscode-editor-background);
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  line-height: 1.4;
+}
+
+.muted,
+.hint {
+  color: var(--sdd-muted);
+}
+
+.hint {
+  font-size: 0.9em;
+}
+
+code,
+.mono {
+  font-family: var(--vscode-editor-font-family);
+}
+
+/* Inputs ------------------------------------------------------------------ */
+
+.input,
+.keyword-select {
+  font: inherit;
+  color: var(--vscode-input-foreground);
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 2px;
+  padding: 3px 6px;
+  min-width: 0;
+}
+
+.input::placeholder {
+  color: var(--vscode-input-placeholderForeground);
+}
+
+.input:focus,
+.keyword-select:focus,
+.tags:focus-within,
+.grid-cell:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.input.invalid:not(:focus) {
+  border-color: var(--vscode-inputValidation-warningBorder, var(--sdd-warning));
+}
+
+.input-small {
+  padding: 2px 5px;
+}
+
+.textarea {
+  display: block;
+  width: 100%;
+  resize: vertical;
+  overflow: hidden;
+  min-height: 26px;
+}
+
+.keyword-select {
+  cursor: pointer;
+  background: var(--vscode-dropdown-background);
+  color: var(--vscode-dropdown-foreground);
+  border-color: var(--vscode-dropdown-border, transparent);
+}
+
+/* Buttons ----------------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: inherit;
+  border: 1px solid transparent;
+  border-radius: var(--sdd-radius);
+  cursor: pointer;
+  color: inherit;
+  background: transparent;
+  white-space: nowrap;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.btn-icon {
+  padding: 3px;
+}
+
+.btn-labelled {
+  padding: 3px 10px 3px 6px;
+}
+
+.btn-ghost:not(:disabled):hover {
+  background: var(--vscode-toolbar-hoverBackground);
+}
+
+.btn-primary {
+  color: var(--vscode-button-foreground);
+  background: var(--vscode-button-background);
+}
+
+.btn-primary:not(:disabled):hover {
+  background: var(--vscode-button-hoverBackground);
+}
+
+.btn-secondary {
+  color: var(--vscode-button-secondaryForeground);
+  background: var(--vscode-button-secondaryBackground);
+}
+
+.btn-secondary:not(:disabled):hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.btn:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+.btn-tiny {
+  padding: 1px;
+}
+
+.btn-tiny .codicon {
+  font-size: 12px;
+}
+
+.link-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: inherit;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--vscode-textLink-foreground);
+}
+
+.link-button:hover {
+  color: var(--vscode-textLink-activeForeground);
+  text-decoration: underline;
+}
+
+/* Row actions appear on hover or keyboard focus to keep forms uncluttered. */
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  opacity: 0;
+  transition: opacity 80ms;
+}
+
+:hover > .row-actions,
+:hover > * > .row-actions,
+:focus-within > .row-actions,
+:focus-within > * > .row-actions {
+  opacity: 1;
+}
+
+/* Tags -------------------------------------------------------------------- */
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  border-radius: 2px;
+  border: 1px solid transparent;
+  cursor: text;
+  min-height: 24px;
+}
+
+.tags:hover {
+  border-color: var(--sdd-border);
+}
+
+.tags-icon {
+  color: var(--sdd-muted);
+  font-size: 12px !important;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 2px 0 6px;
+  border-radius: 10px;
+  font-size: 0.9em;
+  color: var(--vscode-badge-foreground);
+  background: var(--vscode-badge-background);
+}
+
+.tag-remove {
+  display: inline-flex;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.tag-remove:hover {
+  opacity: 1;
+}
+
+.tag-remove .codicon {
+  font-size: 11px;
+}
+
+.tags-input {
+  flex: 1;
+  min-width: 4ch;
+  font: inherit;
+  font-size: 0.9em;
+  color: inherit;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 1px 0;
+}
+
+.tags-input::placeholder {
+  color: var(--sdd-muted);
+}
+
+/* Grid -------------------------------------------------------------------- */
+
+.grid-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.grid {
+  border-collapse: collapse;
+}
+
+.grid td {
+  padding: 0;
+  border: 1px solid var(--sdd-border);
+}
+
+.grid .grid-index,
+.grid .grid-row-actions,
+.grid-column-actions th {
+  border: none;
+  padding: 0 4px;
+  font-weight: normal;
+}
+
+.grid-index {
+  color: var(--sdd-muted);
+  font-size: 0.85em;
+  text-align: right;
+  min-width: 2ch;
+}
+
+.grid-column-actions th {
+  height: 14px;
+  line-height: 0;
+  text-align: center;
+}
+
+.grid-column-actions .btn {
+  opacity: 0;
+}
+
+.grid:hover .grid-column-actions .btn,
+.grid:focus-within .grid-column-actions .btn {
+  opacity: 0.8;
+}
+
+.grid-row-actions {
+  white-space: nowrap;
+}
+
+.grid-row-actions .btn {
+  opacity: 0;
+}
+
+.grid tr:hover .grid-row-actions .btn,
+.grid tr:focus-within .grid-row-actions .btn {
+  opacity: 0.8;
+}
+
+.grid-cell {
+  display: block;
+  width: 100%;
+  min-width: 6ch;
+  font-family: var(--vscode-editor-font-family);
+  font-size: var(--vscode-editor-font-size, 13px);
+  color: var(--vscode-input-foreground);
+  background: var(--vscode-input-background);
+  border: none;
+  padding: 3px 6px;
+}
+
+.grid-header .grid-cell {
+  font-weight: 600;
+  background: var(--vscode-keybindingTable-headerBackground, var(--vscode-editorWidget-background));
+}
+
+.grid td.grid-warn {
+  border-color: var(--sdd-warning);
+}
+
+.grid-header td.grid-warn .grid-cell {
+  text-decoration: underline wavy var(--sdd-warning);
+  text-underline-offset: 3px;
+}
+
+.grid-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+  padding-left: 2ch;
+}
+
+/* Autocomplete ------------------------------------------------------------ */
+
+.autocomplete {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
+
+.autocomplete > .input {
+  flex: 1;
+}
+
+.suggestions {
+  position: absolute;
+  z-index: 20;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin: 2px 0 0;
+  padding: 2px 0;
+  list-style: none;
+  background: var(--vscode-editorSuggestWidget-background, var(--vscode-dropdown-background));
+  border: 1px solid var(--vscode-editorSuggestWidget-border, var(--sdd-border));
+  box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
+}
+
+.suggestions li {
+  padding: 2px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.suggestions li:hover,
+.suggestions li.active {
+  color: var(--vscode-editorSuggestWidget-selectedForeground, inherit);
+  background: var(--vscode-editorSuggestWidget-selectedBackground, var(--vscode-list-activeSelectionBackground));
+}

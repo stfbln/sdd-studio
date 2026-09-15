@@ -1,0 +1,82 @@
+import { useEffect, useMemo, useState } from 'react';
+import { ReworkButton } from '../../../webview/components/ReworkButton';
+import { EditorFrame } from '../../../webview/structured/EditorFrame';
+import { useStructuredDocument, type LocalEngine } from '../../../webview/structured/useStructuredDocument';
+import { applySpecEdits, type SpecEdit } from '../core/edits';
+import { parseSpecFile, type SpecFile } from '../core/parse';
+import { allRequirements, analyzeSpec, plural, type SpecAnchor } from '../core/summary';
+import { Nav } from './Nav';
+import { SpecPage } from './SpecPage';
+import { anchorId, requestedAnchor, SpecContext, type SpecEditorValue } from './state';
+
+const engine: LocalEngine<SpecFile, SpecEdit> = {
+  fromHost: (value) => value as SpecFile,
+  apply: (doc, edits) => parseSpecFile(applySpecEdits(doc.text, edits)),
+  typingKey: (edit) => {
+    switch (edit.op) {
+      case 'setTitle':
+      case 'setDescription':
+      case 'setContext':
+        return edit.op;
+      case 'setRequirement':
+        return `${edit.op} ${edit.group} ${edit.index}`;
+      default:
+        return undefined;
+    }
+  },
+};
+
+const ANCHORS: SpecAnchor[] = ['overview', 'context', 'requirements'];
+
+/** The part of the page at the top of the scrolled pane. */
+function useVisibleAnchor(ready: boolean) {
+  const [visible, setVisible] = useState<SpecAnchor>('overview');
+  useEffect(() => {
+    const pane = document.querySelector('.content-pane');
+    if (!ready || !pane) return;
+    const update = () => {
+      const box = pane.getBoundingClientRect();
+      const top = (anchor: SpecAnchor) => document.getElementById(anchorId(anchor))?.getBoundingClientRect().top ?? Infinity;
+      let current = ANCHORS.filter((anchor) => top(anchor) <= box.top + 48).pop() ?? 'overview';
+      const atBottom = pane.scrollTop > 0 && pane.scrollTop + pane.clientHeight >= pane.scrollHeight - 2;
+      if (atBottom && requestedAnchor && top(requestedAnchor) < box.bottom) current = requestedAnchor;
+      setVisible(current);
+    };
+    update();
+    pane.addEventListener('scroll', update, { passive: true });
+    return () => pane.removeEventListener('scroll', update);
+  }, [ready]);
+  return visible;
+}
+
+export function App() {
+  const doc = useStructuredDocument<null, SpecFile, SpecEdit>(null, engine);
+  const { spec, actions } = doc;
+  const issues = useMemo(() => (spec ? analyzeSpec(spec.model) : []), [spec]);
+  const visible = useVisibleAnchor(!!spec);
+
+  if (!spec) return <div className="loading">Loading spec…</div>;
+
+  const context: SpecEditorValue = { doc: spec, model: spec.model, issues, edit: actions.edit, openAsText: actions.openAsText };
+  return (
+    <SpecContext.Provider value={context}>
+      <EditorFrame
+        icon="book"
+        fileName={doc.fileName}
+        format="markdown"
+        versionLabel={allRequirements(spec.model).length ? plural(allRequirements(spec.model).length, 'requirement') : undefined}
+        catalogLabel="All specs"
+        errors={null}
+        editError={doc.editError}
+        drift={false}
+        onDismissEditError={doc.dismissEditError}
+        onOpenText={actions.openAsText}
+        onOpenCatalog={actions.openCatalog}
+        extraActions={<ReworkButton request={actions.request} />}
+        nav={<Nav current={visible} />}
+      >
+        <SpecPage />
+      </EditorFrame>
+    </SpecContext.Provider>
+  );
+}

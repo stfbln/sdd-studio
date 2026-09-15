@@ -1,0 +1,209 @@
+/* OpenCLI-specific styles; layout and forms come from webview/structured/structured.css. */
+
+.breadcrumb {
+  display: inline-flex;
+  align-items: baseline;
+  white-space: nowrap;
+}
+
+.title-text {
+  font-size: 1.3em;
+  font-weight: 600;
+}
+
+.usage-line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0 12px;
+  padding: 6px 10px;
+  border-radius: var(--sdd-radius);
+  background: var(--vscode-textCodeBlock-background, var(--vscode-textBlockQuote-background));
+}
+
+.usage-line code {
+  font-size: 1.05em;
+  word-break: break-word;
+}
+
+.checkbox-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+}
+
+.arguments-table .table-head,
+.arguments-table .table-row {
+  grid-template-columns: minmax(12ch, 1fr) 13em 3em minmax(12ch, 2fr) 52px;
+}
+
+.options-table .table-head,
+.options-table .table-row {
+  grid-template-columns: minmax(14ch, 1.2fr) minmax(10ch, 1fr) minmax(9ch, 0.8fr) 3em minmax(12ch, 2fr) 52px;
+}
+
+.table-row > input[type='checkbox'] {
+  justify-self: center;
+}
+
+.name-cell,
+.cell-actions,
+.move-buttons,
+.arity,
+.arity-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.name-cell .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.arity {
+  flex-wrap: wrap;
+}
+
+.arity-range .number-input {
+  width: 4.5em;
+}
+
+.number-input {
+  width: 6em;
+}
+
+.table-row .tags {
+  min-width: 0;
+}
+
+.cell-actions .has-details {
+  color: var(--vscode-textLink-foreground);
+}
+
+.row-details {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  margin: 4px 0 10px 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--sdd-border);
+  border-radius: var(--sdd-radius);
+  background: var(--vscode-editor-background);
+}
+
+.row-details .inline-fields {
+  flex-wrap: wrap;
+}
+
+.row-details .row-details {
+  margin-left: 0;
+}
+
+.option-values {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.option-values > .table {
+  align-self: stretch;
+}
+
+.add-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.add-row > .input {
+  flex: 0 1 28ch;
+}
+
+.group-control {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.arguments-table.compact .table-head,
+.arguments-table.compact .table-row {
+  grid-template-columns: minmax(10ch, 1fr) 11.5em 3em minmax(14ch, 1.6fr) 52px;
+}
+
+.inherited-options {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  margin-top: 10px;
+}
+
+.subcommand-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.subcommand-row > .operation-link {
+  flex: 1;
+}
+
+.subcommand-name {
+  font-weight: 600;
+}
+
+.subcommand-description {
+  display: block;
+  font-size: 0.9em;
+}
+
+.metadata {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.metadata > .list-row {
+  align-self: stretch;
+}
+
+.metadata-name {
+  flex: 0 1 18ch;
+}
+
+.help-preview {
+  margin: 0;
+  padding: 10px 12px;
+  overflow-x: auto;
+  border-radius: var(--sdd-radius);
+  background: var(--vscode-textCodeBlock-background, var(--vscode-textBlockQuote-background));
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 0.92em;
+  line-height: 1.45;
+}
+
+.nav-hint {
+  padding: 4px 8px;
+}
+
+@media (max-width: 720px) {
+  .arguments-table .table-head,
+  .options-table .table-head {
+    display: none;
+  }
+
+  .arguments-table .table-row,
+  .options-table .table-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}

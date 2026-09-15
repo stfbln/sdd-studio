@@ -1,0 +1,308 @@
+.prompts {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 16px 48px;
+}
+
+.loading,
+.empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--sdd-muted);
+}
+
+.small {
+  font-size: 0.9em;
+}
+
+.warning-text {
+  color: var(--sdd-warning);
+}
+
+.prompts-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 0 8px;
+}
+
+.prompts-title,
+.mcp-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.prompts-title h1 {
+  margin: 0;
+  font-size: 1.4em;
+  font-weight: 600;
+}
+
+.prompts-title > .codicon {
+  font-size: 20px;
+}
+
+.prompts-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--sdd-border);
+}
+
+.prompts-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font: inherit;
+  color: var(--sdd-muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+
+.prompts-tab:hover {
+  color: var(--vscode-foreground);
+}
+
+.prompts-tab.active {
+  color: var(--vscode-foreground);
+  border-bottom-color: var(--vscode-focusBorder);
+}
+
+.prompts-tab:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+}
+
+.tab-hint {
+  margin: 8px 0 12px;
+}
+
+.prompts-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+}
+
+@media (min-width: 900px) {
+  .prompts-body {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .prompt-preview {
+    position: sticky;
+    top: 8px;
+  }
+}
+
+.prompts-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.field-label {
+  font-weight: 600;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+}
+
+.textarea.tall {
+  min-height: 6em;
+}
+
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.assets {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.asset {
+  display: grid;
+  grid-template-columns: 110px minmax(100px, 1fr) 120px auto;
+  grid-template-areas: 'kind name type remove' 'description description description description';
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--sdd-border);
+  border-radius: var(--sdd-radius);
+}
+
+.asset > select {
+  grid-area: kind;
+}
+
+.asset .asset-type {
+  grid-area: type;
+}
+
+.asset .asset-description {
+  grid-area: description;
+}
+
+.asset > .btn {
+  grid-area: remove;
+}
+
+.chosen {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.tag-missing {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.picker-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.search {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 160px;
+}
+
+.search .codicon {
+  position: absolute;
+  left: 6px;
+  color: var(--sdd-muted);
+  pointer-events: none;
+}
+
+.search .input {
+  width: 100%;
+  padding-left: 24px;
+}
+
+.picker {
+  max-height: 360px;
+  overflow: auto;
+  border: 1px solid var(--sdd-border);
+  border-radius: var(--sdd-radius);
+}
+
+.picker-group-label {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 4px 8px;
+  font-size: 0.85em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--sdd-muted);
+  background: var(--sdd-card-bg);
+}
+
+.picker-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.picker-item:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.picker-item.selected {
+  background: var(--vscode-list-inactiveSelectionBackground);
+}
+
+.picker-item input {
+  margin-top: 3px;
+}
+
+.picker-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.picker-description {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.picker-open {
+  opacity: 0;
+}
+
+.picker-item:hover .picker-open,
+.picker-open:focus-visible {
+  opacity: 1;
+}
+
+.prompt-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.prompt-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.prompt-toolbar h2 {
+  margin: 0;
+  font-size: 1.1em;
+}
+
+.prompt-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.prompt-text {
+  margin: 0;
+  max-height: calc(100vh - 140px);
+  overflow: auto;
+  padding: 10px 12px;
+  font-family: var(--vscode-editor-font-family);
+  font-size: var(--vscode-editor-font-size);
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--vscode-textCodeBlock-background, var(--sdd-card-bg));
+  border: 1px solid var(--sdd-border);
+  border-radius: var(--sdd-radius);
+}

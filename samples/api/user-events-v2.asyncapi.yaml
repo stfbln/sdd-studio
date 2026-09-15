@@ -1,0 +1,49 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/asyncapi/spec-json-schemas/master/schemas/2.6.0.json
+# How to update this file (for people and AI assistants): an AsyncAPI 2.6 document, see
+#   https://www.asyncapi.com/docs/reference/specification/v2.6.0.
+# - Purpose: The contract of an event-driven or messaging API. What belongs in other files:
+#   - Owner, lifecycle, system, and which components provide or consume the API: the catalog
+#     (info.title and contact only repeat what the format requires).
+#   - Behaviour shown by examples (workflows, business rules): Gherkin features.
+#   - Quality targets and constraints the format cannot express (latency, availability, rate limit
+#     policies, retention): the markdown spec of the entity.
+#   - Threats and mitigations: the threat model.
+# - Keep the file valid against the JSON schema of the first line; when you change "asyncapi", link
+#   the schema of that version.
+# - Channels hold their publish and subscribe operations and messages; declare each {parameter} of a
+#   channel name under its parameters.
+# - Keep operationIds unique; define reusable messages and schemas under components and use them
+#   with $ref: '#/components/messages/Name'.
+# - Software catalog files and other specs refer to this file by its path: keep its name and folder.
+# - Keep this header and the existing comments.
+
+# Sample AsyncAPI 2.6 specification (channels hold publish/subscribe operations).
+asyncapi: '2.6.0'
+info:
+  title: User Events
+  version: 2.0.0
+servers:
+  broker:
+    url: mqtt://broker.example.com
+    protocol: mqtt
+channels:
+  users/{userId}/signedup:
+    parameters:
+      userId:
+        description: Id of the user
+        schema:
+          type: string
+    subscribe:
+      operationId: onUserSignedUp
+      summary: A user signed up
+      message:
+        $ref: '#/components/messages/UserSignedUp'
+components:
+  messages:
+    UserSignedUp:
+      payload:
+        type: object
+        properties:
+          email:
+            type: string
+            format: email

@@ -1,0 +1,79 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/asyncapi/spec-json-schemas/master/schemas/3.0.0.json
+# How to update this file (for people and AI assistants): an AsyncAPI 3.0 document, see
+#   https://www.asyncapi.com/docs/reference/specification/v3.0.0.
+# - Purpose: The contract of an event-driven or messaging API. What belongs in other files:
+#   - Owner, lifecycle, system, and which components provide or consume the API: the catalog
+#     (info.title and contact only repeat what the format requires).
+#   - Behaviour shown by examples (workflows, business rules): Gherkin features.
+#   - Quality targets and constraints the format cannot express (latency, availability, rate limit
+#     policies, retention): the markdown spec of the entity.
+#   - Threats and mitigations: the threat model.
+# - Keep the file valid against the JSON schema of the first line; when you change "asyncapi", link
+#   the schema of that version.
+# - Channels list their messages and declare each {parameter} of their address; operations have an
+#   action (send or receive), a channel ($ref) and messages of that channel.
+# - Keep operationIds unique; define reusable messages and schemas under components and use them
+#   with $ref: '#/components/messages/Name'.
+# - Software catalog files and other specs refer to this file by its path: keep its name and folder.
+# - Keep this header and the existing comments.
+
+# Sample AsyncAPI 3.0 specification for the SDD AsyncAPI form editor.
+asyncapi: 3.0.0
+info:
+  title: Order Events
+  version: 1.0.0
+  description: Events published and consumed by the order service.
+servers:
+  production:
+    host: kafka.example.com:9092
+    protocol: kafka
+    description: Production cluster
+channels:
+  orderCreated:
+    address: orders.{region}.created
+    parameters:
+      region:
+        description: Sales region
+    messages:
+      orderCreated:
+        $ref: '#/components/messages/OrderCreated'
+  orderShipped:
+    address: orders.shipped
+    messages:
+      orderShipped:
+        $ref: '#/components/messages/OrderShipped'
+operations:
+  publishOrderCreated:
+    action: send
+    channel:
+      $ref: '#/channels/orderCreated'
+    messages:
+      - $ref: '#/channels/orderCreated/messages/orderCreated'
+  onOrderShipped:
+    action: receive
+    channel:
+      $ref: '#/channels/orderShipped'
+components:
+  messages:
+    OrderCreated:
+      title: Order created
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/Order'
+    OrderShipped:
+      payload:
+        type: object
+        properties:
+          orderId:
+            type: string
+            format: uuid
+  schemas:
+    Order:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: string
+          format: uuid
+        total:
+          type: number

@@ -1,0 +1,17 @@
+/* OpenAPI-specific colors; layout and forms come from webview/structured/structured.css. */
+
+.badge-get { --badge-color: #2f7fd6; }
+.badge-post { --badge-color: #3c9a50; }
+.badge-put { --badge-color: #c77c11; }
+.badge-patch { --badge-color: #8a6bbf; }
+.badge-delete { --badge-color: #d14343; }
+.badge-head,
+.badge-options,
+.badge-trace { --badge-color: #6b7280; }
+
+.status-2 { --status-color: #3c9a50; }
+.status-3 { --status-color: #2f7fd6; }
+.status-4 { --status-color: #c77c11; }
+.status-5,
+.status-d { --status-color: #d14343; }
+

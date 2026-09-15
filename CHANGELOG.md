@@ -1,0 +1,54 @@
+# Changelog
+
+## Unreleased
+
+- Software catalog: Platform and Infrastructure resources (Kubernetes clusters, PaaS, VMs, bare-metal servers…) that components and resources declare being deployed on (`sdd-studio/deployed-on`, a checklist next to networks, data assets and artifacts); Site resources (a cloud provider region or physical location, with a cloud provider and a region or address) that networks, platforms and infrastructure can point to (`sdd-studio/site`); artifacts can now be produced by a repository, not only a component, system or team.
+- OpenSLO module: form editor for OpenSLO YAML files (Service, SLO, SLI, DataSource, AlertPolicy, AlertCondition and AlertNotificationTarget objects, one per YAML document) with reference pickers, renames and deletes that update references, checks, update instructions and template; OpenSLO Files overview page. Software catalog: entities create and link OpenSLO files the same way as markdown specs and features.
+- Default folders (`sdd.*.specsFolder`, `sdd.gherkin.featuresFolder`, `sdd.otm.threatModelsFolder`, `sdd.backstage.catalogFolder`) now nest under `specs/` and use plural names (`specs/apis`, `specs/protos`, `specs/clis`, `specs/features`, `specs/threat-models`, `specs/catalogs`, `specs/slos`, `specs/generics` for markdown specs).
+- Prompts for AI assistants: a fourth prompt, **From existing code**, scans a repository and creates the catalog entries and spec files for what it already contains.
+- Prompts and update instructions: a rule against silently accepting a near-miss typo of an existing entity, API, field or resource name; flag the mismatch and ask instead.
+- Gherkin update instructions: avoid near-duplicate scenarios that only differ by data, use a Scenario Outline with an Examples table instead.
+- Prompts for AI assistants: a page writing prompts for an LLM, tailored to SDD Studio and its MCP tools. **New system** takes a name, owner, domain, context and the known assets with a quick explanation; **Update specs** and **Implement specs** take entities picked from the catalog (grouped by system) with the change or implementation notes. Live preview, copy, open in an editor, drafts kept, MCP server status.
+- MCP server and API: `create_catalog_file` creates the catalog file of a new system or domain; catalog entities give their system and owner.
+
+- API and MCP server for AI assistants and other extensions: describe what each kind of file is for and which file is the source of truth for what, list and read catalog entities (everything the catalog knows about one), list and check spec files, create spec files and threat models for a catalog entity and link them from it, link existing files. Created files and catalog changes are left open unsaved for review, unless `sdd.api.writeWithoutReview` is on. The MCP server listens on 127.0.0.1 with a token (`sdd.mcp.enabled`, `sdd.mcp.port`), is registered with VS Code chat, and is published to terminals as `SDD_STUDIO_MCP_URL` and `SDD_STUDIO_MCP_TOKEN`; **Configure Claude Code (MCP)** adds it to `.mcp.json`. Requires VS Code 1.101.
+- Update instructions start with the purpose of the file and what belongs in other files. Samples carry the new headers.
+- Markdown specs created from the catalog point to the catalog entry instead of copying its facts, and only get the requirements the catalog and the specific spec files cannot express. An entity has one markdown spec.
+- Spec kinds report their problems, not only their count.
+
+- Software catalog: create spec files (markdown spec, feature, OpenAPI, AsyncAPI, gRPC, OpenCLI, OpenSLO) and threat models from an entity page. The new file goes to the default folder of its kind, is linked to the entity and opened, and is filled from the catalog: title, description, owner and contact, system, APIs, dependencies, networks, data assets and links; threat models get trust zones from networks, components from components and resources, assets from data assets and dataflows from dependencies and API use, and unlinked networks point to the new trust zones.
+- Form editors can send requests to their host and wait for the answer.
+
+- Update instructions for people and AI assistants at the top of spec files: link to the JSON schema of the format and version (`yaml-language-server` modeline in YAML, `$schema` or `x-json-schema` in JSON) and the rules and SDD Studio conventions the schema does not cover (comments in YAML, Gherkin and Protocol Buffers, an HTML comment in markdown specs). Written in new files (setting `sdd.instructions.addToNewFiles`), added or refreshed in existing files by **Add Update Instructions for AI Assistants** (active file, Explorer selection or every spec file of the workspace), and kept up to date by the forms. Samples carry them.
+- Markdown specs: HTML comments at the top of the file are not part of the description.
+- Markdown specs: groups can be created empty and filled by moving existing requirements into them, reordered and deleted; a group no longer disappears with its last requirement.
+
+- Software catalog: consolidated view of every catalog file of a workspace folder in one form (outline filtered by file, references, renames and deletes across files, choice of the file receiving new entities, moving entities between files with their relative paths rewritten, edits saved per file, reload on outside changes, files with syntax errors reported).
+- Form editors can offer named commands to their webview.
+
+- Software catalog: descriptions under the title of every entity; networks (Resources of type `network`) linked to threat model trust zones, with parent networks, IP ranges, placement of components and resources compared with the threat models and import of networks from trust zones; artifacts (Resources of type `artifact`) with type, package URL, producing entity or external supplier; repositories (Resources of type `repository`) holding the code of components, resources and artifacts, which get `backstage.io/source-location` kept in sync.
+- Threat model index: trust zones and components of each threat model are available to other modules.
+
+- Software catalog module: form editor for Backstage catalog files (`catalog-info.yaml`, one entity per YAML document) with domains, systems, components, APIs, resources, data assets (Resources of type `data-asset` with a classification), groups, users and locations; hierarchy outline; references picked from the entities of the workspace catalog files; renames and deletes that update references; linking spec files to entities (API specs through API entities and `providesApis`, other specs and threat models through `sdd-studio/specs` and `sdd-studio/threat-models` annotations) with inherited threat models and a coverage table; checks; Software Catalog overview page.
+- Multi-document YAML engine: edits rewrite only the documents they touch.
+- Every module's spec index is registered, so a module can offer the spec files of the others.
+
+- Threat model module: form editor for Open Threat Model (OTM 0.2.0) YAML/JSON files (project, representations, trust zones, components, dataflows, assets, threats, mitigations, attributes), reference pickers, id renames that update references, threat register, checks; Threat Models overview page.
+- YAML edits: filling a value left empty (`key:`) keeps the blank line that followed it, and an empty `""` value loses its quotes once filled when they are not needed. JSON edits can write inside a `null` value.
+- Outline "add" inputs can show a placeholder and use the regular font.
+- Specs module: form editor for markdown specs (`*.spec.md`) with title, description, context and requirements written with the RFC 2119 key words (MUST, MUST NOT, SHOULD, SHOULD NOT, MAY), optional requirement groups and the BCP 14 conformance sentence; only filled parts are written, other content is kept as written; checks; Specs overview page.
+- Auto-growing text areas refit their height when their width changes.
+- OpenCLI module: form editor for OpenCLI YAML/JSON descriptions (CLI information, conventions, command tree with arguments, options, subcommands, exit codes, examples and metadata), usage line and help preview, checks, support for the older top-level root command layout with a one-click move into `command`; CLI Specs overview page.
+- YAML/JSON targeted edits can move an array item, keeping its comments.
+- gRPC / Protobuf module: form editor for `.proto` files (syntax, package, imports, file options, services, RPCs with streaming, messages with fields, maps, oneofs, nested types and reserved ranges, enums) applying targeted text edits that keep comments and layout; type suggestions that add missing imports, renames that update references, protoc-style checks, import resolution in the workspace; gRPC / Protobuf Files overview page.
+- The form editor host and document sync accept other file engines than YAML/JSON.
+- AsyncAPI module: form editor for AsyncAPI 2.x and 3.0 YAML/JSON files (servers, channels, operations, messages, payloads, schemas, checks) and AsyncAPI Specs overview page.
+- New YAML strings follow the file's quote style.
+- OpenAPI module: form editor for OpenAPI 3.0/3.1 YAML and JSON files (info, servers, tags, paths, operations, parameters, request bodies, responses, schemas) applying targeted edits that preserve comments and formatting.
+- API Specs overview page, sharing a generic spec catalog with the Features overview (YAML/JSON choice, OpenAPI detection by content, problem counts, confirmation before moving specs with relative references).
+- SDD Studio menu in the Explorer title bar.
+- Features overview page: list all features by folder, create features with slug file names, create folders, move and delete features.
+
+## 0.1.0
+
+- First module: visual editor for Gherkin `.feature` files.

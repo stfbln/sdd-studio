@@ -1,0 +1,95 @@
+# Service level objectives of the checkout service (OpenSLO format).
+# Open this file with SDD Studio to edit it as a form.
+apiVersion: openslo/v1
+kind: Service
+metadata:
+  name: checkout
+  displayName: Checkout service
+spec:
+  description: Accepts orders and charges the customer's card.
+---
+apiVersion: openslo/v1
+kind: DataSource
+metadata:
+  name: checkout-prometheus
+  displayName: Checkout Prometheus
+spec:
+  type: Prometheus
+  connectionDetails:
+    url: http://prometheus.monitoring.svc:9090
+---
+apiVersion: openslo/v1
+kind: SLI
+metadata:
+  name: checkout-availability
+  displayName: Checkout availability
+spec:
+  description: Ratio of checkout requests that complete without a server error.
+  ratioMetric:
+    counter: true
+    good:
+      metricSource:
+        type: Prometheus
+        metricSourceRef: checkout-prometheus
+        spec:
+          query: sum(rate(http_requests_total{service="checkout",code!~"5.."}[5m]))
+    total:
+      metricSource:
+        type: Prometheus
+        metricSourceRef: checkout-prometheus
+        spec:
+          query: sum(rate(http_requests_total{service="checkout"}[5m]))
+---
+apiVersion: openslo/v1
+kind: AlertNotificationTarget
+metadata:
+  name: checkout-pagerduty
+spec:
+  description: Pages the on-call engineer for the checkout service.
+  target: PagerDuty
+---
+apiVersion: openslo/v1
+kind: AlertCondition
+metadata:
+  name: checkout-fast-burn
+  displayName: Fast burn
+spec:
+  description: The error budget is being burned much faster than sustainable.
+  severity: page
+  condition:
+    kind: burnrate
+    threshold: 14.4
+    lookbackWindow: 5m
+    alertAfter: 5m
+---
+apiVersion: openslo/v1
+kind: AlertPolicy
+metadata:
+  name: checkout-availability-alerts
+spec:
+  description: Pages on-call when the checkout availability error budget burns too fast.
+  alertWhenBreaching: true
+  conditions:
+    - checkout-fast-burn
+  notificationTargets:
+    - checkout-pagerduty
+---
+apiVersion: openslo/v1
+kind: SLO
+metadata:
+  name: checkout-availability
+  displayName: Checkout availability
+spec:
+  description: 99.9% of checkout requests succeed over a rolling 28 day window.
+  service: checkout
+  indicatorRef: checkout-availability
+  budgetingMethod: Occurrences
+  timeWindow:
+    - duration: 28d
+      isRolling: true
+  objectives:
+    - displayName: Availability
+      op: gte
+      target: 0.999
+  alertPolicies:
+    - checkout-availability-alerts

@@ -1,0 +1,44 @@
+{
+  "$schema": "https://opencli.org/draft.json",
+  "opencli": "0.1",
+  "info": {
+    "title": "todo",
+    "version": "1.0.0",
+    "description": "A small to-do list manager."
+  },
+  "conventions": {
+    "groupOptions": true
+  },
+  "command": {
+    "name": "todo",
+    "options": [
+      { "name": "--help", "aliases": ["-h"], "description": "Show help.", "recursive": true }
+    ],
+    "commands": [
+      {
+        "name": "add",
+        "description": "Add a task.",
+        "arguments": [
+          { "name": "TEXT", "required": true, "arity": { "minimum": 1 } }
+        ],
+        "options": [
+          {
+            "name": "--priority",
+            "aliases": ["-p"],
+            "arguments": [
+              { "name": "LEVEL", "required": true, "acceptedValues": ["low", "normal", "high"] }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "list",
+        "aliases": ["ls"],
+        "description": "List tasks.",
+        "options": [
+          { "name": "--all", "aliases": ["-a"], "description": "Include completed tasks." }
+        ]
+      }
+    ]
+  }
+}

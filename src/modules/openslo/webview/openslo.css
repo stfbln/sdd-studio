@@ -1,0 +1,91 @@
+/* OpenSLO styles; layout and forms come from webview/structured/structured.css. */
+
+.title-text {
+  font-size: 1.3em;
+  font-weight: 600;
+}
+
+.warning-text {
+  color: var(--sdd-warning);
+}
+
+.checkbox-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+}
+
+.move-buttons {
+  display: inline-flex;
+}
+
+.nav-hint {
+  padding: 4px 8px;
+}
+
+.count-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-size: 0.85em;
+  white-space: nowrap;
+  border: 1px solid var(--sdd-border);
+  background: var(--sdd-card-bg);
+}
+
+.counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.link-create {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.link-create .input {
+  min-width: 22ch;
+}
+
+.attribute-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.attribute-row > .key-input {
+  flex: 0 1 30ch;
+}
+
+.attribute-row > .input {
+  flex: 1 1 20ch;
+}
+
+.services-table .table-head,
+.services-table .table-row {
+  grid-template-columns: minmax(14ch, 1fr) minmax(16ch, 2fr) 6em;
+}
+
+.slos-table .table-head,
+.slos-table .table-row {
+  grid-template-columns: minmax(14ch, 1fr) minmax(10ch, 0.8fr) minmax(10ch, 0.8fr) minmax(8ch, 0.6fr);
+}
+
+@media (max-width: 720px) {
+  .services-table .table-head,
+  .slos-table .table-head {
+    display: none;
+  }
+
+  .services-table .table-row,
+  .slos-table .table-row {
+    grid-template-columns: 1fr;
+  }
+}

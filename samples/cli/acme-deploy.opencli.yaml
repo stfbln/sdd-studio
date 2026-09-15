@@ -1,0 +1,105 @@
+# yaml-language-server: $schema=https://opencli.org/draft.json
+# How to update this file (for people and AI assistants): an OpenCLI description of a command-line
+#   tool, see https://opencli.org.
+# - Purpose: The contract of a command line tool. What belongs in other files:
+#   - Owner, lifecycle, system, and which components provide or consume the API: the catalog
+#     (info.title and contact only repeat what the format requires).
+#   - Behaviour shown by examples (workflows, business rules): Gherkin features.
+#   - Quality targets and constraints the format cannot express (latency, availability, rate limit
+#     policies, retention): the markdown spec of the entity.
+#   - Threats and mitigations: the threat model.
+# - Keep the file valid against the JSON schema of the first line; when you change "opencli", link
+#   the schema of that version.
+# - The root command is under "command" (name, description, options, arguments, commands, exitCodes,
+#   examples); subcommands nest the same way under "commands".
+# - Option names keep their dashes (--config, with -c under aliases); recursive: true makes an
+#   option available to every subcommand.
+# - Arguments (of commands and options) have a name, required and arity {minimum, maximum};
+#   acceptedValues lists the allowed values.
+# - Keep this header and the existing comments.
+
+# OpenCLI description of the acme deploy tool.
+# Edit it with the SDD form editor or by hand: both stay in sync.
+opencli: "0.1"
+info:
+  title: Acme deploy
+  version: 2.3.0
+  summary: Deploy Acme services to any environment
+  contact:
+    name: Platform team
+    email: platform@acme.example
+  license:
+    name: MIT License
+    identifier: MIT
+command:
+  name: acme
+  description: Build, deploy and roll back Acme services.
+  options:
+    - name: --verbose
+      aliases: [-v]
+      description: Show detailed logs.
+      recursive: true
+    - name: --config
+      aliases: [-c]
+      description: Path of the configuration file.
+      recursive: true
+      arguments:
+        - name: FILE
+          required: true
+    - name: --version
+      description: Show version information.
+  commands:
+    - name: deploy
+      description: Deploy a service to an environment.
+      arguments:
+        - name: SERVICE
+          required: true
+          description: Name of the service to deploy.
+      options:
+        - name: --env
+          aliases: [-e]
+          required: true
+          description: Target environment.
+          arguments:
+            - name: ENVIRONMENT
+              required: true
+              acceptedValues: [dev, staging, production]
+        - name: --dry-run
+          description: Show what would change without deploying.
+      exitCodes:
+        - code: 0
+          description: Deployed
+        - code: 3
+          description: Health checks failed after deploying
+      examples:
+        - acme deploy billing --env staging
+        - acme deploy billing -e production --dry-run
+    - name: rollback
+      aliases: [rb]
+      description: Roll a service back to a previous release.
+      interactive: true
+      arguments:
+        - name: SERVICE
+          required: true
+        - name: RELEASE
+          description: Release to restore (default is the previous one).
+    - name: config
+      description: Read and write configuration values.
+      commands:
+        - name: get
+          arguments:
+            - name: KEY
+              required: true
+        - name: set
+          arguments:
+            - name: KEY
+              required: true
+            - name: VALUES
+              required: true
+              arity:
+                minimum: 1
+  exitCodes:
+    - code: 0
+      description: Success
+    - code: 1
+      description: General error

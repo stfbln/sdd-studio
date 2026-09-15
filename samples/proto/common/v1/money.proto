@@ -1,0 +1,33 @@
+// How to update this file (for people and AI assistants): a Protocol Buffers file, see
+//   https://protobuf.dev/programming-guides/proto3/.
+// - Purpose: The contract of a gRPC API and its Protocol Buffers messages. What belongs in other
+//   files:
+//   - Owner, lifecycle, system, and which components provide or consume the API: the catalog
+//     (info.title and contact only repeat what the format requires).
+//   - Behaviour shown by examples (workflows, business rules): Gherkin features.
+//   - Quality targets and constraints the format cannot express (latency, availability, rate limit
+//     policies, retention): the markdown spec of the entity.
+//   - Threats and mitigations: the threat model.
+// - Follow the style guide (https://protobuf.dev/programming-guides/style/): PascalCase messages,
+//   enums, services and rpcs; snake_case fields; UPPER_SNAKE_CASE enum values prefixed with the
+//   enum name, the first one being 0 and unspecified.
+// - Never change or reuse the number of a published field: remove a field by adding its number and
+//   name to "reserved".
+// - Import other files by their path from the proto root folder, as protoc -I does (e.g. import
+//   "common/v1/money.proto"), and refer to their types with the full package name.
+// - A comment right above a message, field, enum, service or rpc documents it.
+// - Keep this header and the existing comments.
+
+syntax = "proto3";
+
+package acme.common.v1;
+
+option go_package = "github.com/acme/shop/gen/common/v1;commonv1";
+
+// An amount of money in a given currency.
+message Money {
+  // ISO 4217 currency code, e.g. "EUR".
+  string currency_code = 1;
+  // Amount in minor units (cents).
+  int64 amount_minor = 2;
+}

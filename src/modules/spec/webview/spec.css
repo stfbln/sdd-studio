@@ -1,0 +1,168 @@
+/* Markdown spec styles; layout and forms come from webview/structured/structured.css. */
+
+/* RFC 2119 levels: absolute (red), recommended (amber), optional (blue). */
+.kw-must { --badge-color: #c2410c; }
+.kw-must-not { --badge-color: #9f1239; }
+.kw-should { --badge-color: #b7791f; }
+.kw-should-not { --badge-color: #8a5a00; }
+.kw-may { --badge-color: #2f7fd6; }
+.kw-none { --badge-color: var(--sdd-warning); }
+
+select.kw {
+  width: 9.2em;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 0.85em;
+  font-weight: 700;
+  border-left: 4px solid var(--badge-color);
+}
+
+.spec-page label.checkbox {
+  white-space: normal;
+}
+
+.section-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.section-actions .kind-badge {
+  min-width: 0;
+  padding: 0 6px;
+}
+
+.spec-page .section-body > .field {
+  gap: 2px;
+}
+
+.spec-page .title-input {
+  width: 100%;
+}
+
+.requirement-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  container-type: inline-size;
+}
+
+.requirement-group + .requirement-group {
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--sdd-border);
+}
+
+.requirement-group-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.requirement-group-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.requirement-group-header .group-name {
+  font-weight: 600;
+  min-width: 18ch;
+}
+
+.requirement-group.pending {
+  padding: 8px;
+  border: 1px dashed var(--sdd-border);
+  border-radius: var(--sdd-radius);
+}
+
+.requirement-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.requirement-row {
+  display: grid;
+  grid-template-columns: 2.4ch auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 6px;
+}
+
+.requirement-number {
+  padding-top: 4px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--sdd-muted);
+}
+
+.requirement-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-top: 1px;
+}
+
+.requirement-add {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-left: calc(2.4ch + 6px);
+}
+
+.requirement-add-input {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.add-preview-text {
+  color: var(--vscode-foreground);
+}
+
+.group-select {
+  max-width: 12em;
+}
+
+.requirement-add .input:not(:focus):placeholder-shown {
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--sdd-border);
+}
+
+.other-sections {
+  margin: 0;
+  padding-left: 18px;
+}
+
+/* Rows follow the width they get (narrow editor groups), not the window width. */
+@container (max-width: 560px) {
+  .requirement-row {
+    grid-template-columns: 2.4ch minmax(0, 1fr);
+  }
+
+  .requirement-row > select.kw {
+    justify-self: start;
+  }
+
+  .requirement-row > .textarea,
+  .requirement-actions {
+    grid-column: 2;
+  }
+
+  .requirement-actions {
+    justify-content: flex-end;
+  }
+
+  .requirement-add {
+    flex-wrap: wrap;
+  }
+}
+
+.requirement-row .textarea {
+  resize: none;
+}

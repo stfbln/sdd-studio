@@ -1,0 +1,127 @@
+# Software catalog of the online shop (Backstage format).
+# Register this file in Backstage, or open it with SDD Studio to edit it as a form.
+apiVersion: backstage.io/v1alpha1
+kind: Domain
+metadata:
+  name: commerce
+  title: Commerce
+  description: Everything customers use to find and buy products.
+spec:
+  owner: checkout-team
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: online-shop
+  title: Online shop
+  description: Customers browse the catalog and pay for their orders by card.
+  tags:
+    - checkout
+    - pci
+  annotations:
+    sdd-studio/threat-models: ../threat-models/online-shop.otm.yaml
+spec:
+  owner: checkout-team
+  domain: commerce
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: shop-api
+  title: Shop API
+  description: Orders, payments and the product catalog.
+  annotations:
+    sdd-studio/specs: ../specs/payment-service.spec.md, ../features/shop.feature
+spec:
+  type: service
+  lifecycle: production
+  owner: checkout-team
+  system: online-shop
+  providesApis:
+    - petstore-api
+    - order-events
+  dependsOn:
+    - resource:orders-db
+    - resource:card-data
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: deploy-cli
+  title: Deploy CLI
+spec:
+  type: cli
+  lifecycle: experimental
+  owner: platform-team
+  system: online-shop
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: petstore-api
+  title: Petstore API
+spec:
+  type: openapi
+  lifecycle: production
+  owner: checkout-team
+  system: online-shop
+  definition:
+    $text: ../api/petstore.openapi.yaml
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: order-events
+  title: Order events
+spec:
+  type: asyncapi
+  lifecycle: production
+  owner: checkout-team
+  system: online-shop
+  definition:
+    $text: ../api/order-events.asyncapi.yaml
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: orders-db
+  title: Orders database
+spec:
+  type: database
+  owner: checkout-team
+  system: online-shop
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: card-data
+  title: Card data
+  description: Card numbers and expiry dates, tokenized before storage.
+  labels:
+    sdd-studio/data-classification: restricted
+spec:
+  type: data-asset
+  owner: checkout-team
+  system: online-shop
+  dependsOn:
+    - resource:orders-db
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: checkout-team
+  title: Checkout team
+spec:
+  type: team
+  profile:
+    email: checkout@example.com
+  children: []
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: platform-team
+  title: Platform team
+spec:
+  type: team
+  children: []
