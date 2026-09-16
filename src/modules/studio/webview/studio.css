@@ -1,0 +1,175 @@
+.studio {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 16px 32px;
+}
+
+.loading,
+.empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--sdd-muted);
+}
+
+/* Header ------------------------------------------------------------------ */
+
+.hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 32px 0 24px;
+}
+
+.hero-icon {
+  font-size: 32px !important;
+  color: var(--vscode-textLink-foreground);
+}
+
+.hero-text {
+  min-width: 0;
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: 1.8em;
+  font-weight: 600;
+}
+
+.hero-tagline {
+  margin: 4px 0 0;
+  max-width: 70ch;
+  color: var(--sdd-muted);
+}
+
+.hero .hint {
+  margin: 8px 0 0;
+}
+
+/* Sections ---------------------------------------------------------------- */
+
+.studio-section {
+  padding-top: 20px;
+}
+
+.studio-section h2 {
+  margin: 0;
+  font-size: 1.1em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--sdd-muted);
+}
+
+.studio-section .hint {
+  margin: 2px 0 12px;
+  max-width: 80ch;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+/* Cards ------------------------------------------------------------------- */
+
+.card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: 'icon title' 'icon description' 'icon footer';
+  align-content: start;
+  gap: 2px 10px;
+  padding: 12px 14px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: var(--sdd-card-bg);
+  border: 1px solid var(--sdd-border);
+  border-radius: var(--sdd-radius);
+  cursor: pointer;
+}
+
+.card:hover {
+  border-color: var(--vscode-focusBorder);
+  background: var(--vscode-list-hoverBackground, var(--sdd-card-bg));
+}
+
+.card:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+.card-icon {
+  grid-area: icon;
+  align-self: start;
+  margin-top: 1px;
+  font-size: 18px !important;
+  color: var(--vscode-textLink-foreground);
+}
+
+.card-title {
+  grid-area: title;
+  font-weight: 600;
+}
+
+.card-description {
+  grid-area: description;
+  color: var(--sdd-muted);
+  font-size: 0.95em;
+}
+
+.card-footer {
+  grid-area: footer;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 0.9em;
+}
+
+.card-count {
+  color: var(--vscode-foreground);
+}
+
+.card-problems {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--sdd-warning);
+}
+
+.card-problems .codicon {
+  font-size: 13px;
+}
+
+/* The pages a workspace starts from get more room. */
+.card-featured {
+  grid-column: span 2;
+}
+
+.card-featured .card-icon {
+  font-size: 22px !important;
+}
+
+.card-featured .card-title {
+  font-size: 1.1em;
+}
+
+@media (max-width: 620px) {
+  .cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .card-featured {
+    grid-column: span 1;
+  }
+}
+
+/* Footer ------------------------------------------------------------------ */
+
+.studio-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 24px;
+}

@@ -13,6 +13,7 @@ import { otmModule } from './modules/otm';
 import { promptsModule } from './modules/prompts';
 import { protoModule } from './modules/proto';
 import { specModule } from './modules/spec';
+import { studioModule } from './modules/studio';
 import type { SddModule } from './modules/types';
 
 const modules: SddModule[] = [
@@ -27,6 +28,7 @@ const modules: SddModule[] = [
   openSloModule,
   promptsModule,
   adrModule,
+  studioModule,
 ];
 
 /** Returns the API other extensions use (see `api/types.ts`); AI assistants reach it through the MCP server. */

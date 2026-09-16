@@ -9,6 +9,26 @@ Each spec format is a *module*. Available modules: **Gherkin** (`.feature` files
 
 **Each fact has one home.** The software catalog is the entry point and the source of truth for what exists, who owns it and how it fits together. The specific spec files linked from its entities (API definitions, features, threat models) are the source of truth for what they describe. The markdown spec of an entity only holds the requirements none of them can express. AI assistants and other extensions work with the files through an [API and MCP server](#api-and-mcp-server-for-ai-assistants) that advertises this.
 
+## Home page
+
+The **SDD Studio** icon in the Activity Bar, on the left next to the Explorer, opens the side view of the extension:
+
+- **Home:** an **Open SDD Studio** button, which opens the home page as a full editor tab.
+- **Documents:** one row per kind of spec, with how many files the workspace holds and how many problems were found in them. Clicking a kind unfolds its files, in folder order, each opening in its form editor; the button on the right of the row opens the catalog page of the kind instead. Files that cannot be read, or that have problems, carry an error or warning icon.
+- **Miscellaneous:** **Prompts** and **Consolidated Catalog**, the two pages that are not about one kind of file.
+
+The same page is opened by **SDD Studio: Open SDD Studio** and by the first entry of the **SDD Studio** menu in the Explorer title bar.
+
+The page gathers everything in one place:
+
+- **Catalog:** the [Software Catalog](#software-catalog-module-backstage) page and the [consolidated catalog](#software-catalog-module-backstage) of a workspace folder.
+- **Specifications:** one card per format, saying what those files are for, how many the workspace holds and how many problems were found in them. Click one to open its [catalog page](#spec-catalogs), where specs are browsed, created and organised.
+- **AI assistants:** the [prompts page](#prompts-for-ai-assistants), [update instructions](#update-instructions-for-ai-assistants) for every spec file of the workspace, and the [MCP server](#api-and-mcp-server-for-ai-assistants) configuration for Claude Code.
+
+Counts refresh as files change, both on the page and in the side view, and the page comes back after a window reload.
+
+The same entries are in the **SDD Studio** menu of the Explorer title bar: the home page, then the prompts page and the consolidated catalog, then the catalog page of each format under the name of the page it opens (**Features**, **API Specifications**, …). Creating a file is done from a catalog page or from the Explorer context menu on a folder.
+
 ## Gherkin module
 
 Opening a `.feature` file shows the visual editor. Use the **Open as Text** button in the editor title bar to switch to text, and **Open in Visual Editor** to switch back.
@@ -27,7 +47,7 @@ What you can do:
 
 ### Features overview
 
-**SDD Gherkin: Open Features Overview** opens the catalog page of all features (see [Spec catalogs](#spec-catalogs)). It is also available from the **SDD Studio** menu in the Explorer title bar, **All features** in the visual editor toolbar, and the Explorer context menu on a folder.
+**SDD Gherkin: Features** opens the catalog page of all features (see [Spec catalogs](#spec-catalogs)). It is also available from the **SDD Studio** menu in the Explorer title bar, **All features** in the visual editor toolbar, and the Explorer context menu on a folder.
 
 Other commands (Command Palette → *SDD Gherkin*):
 
@@ -73,7 +93,7 @@ Types include references: choose `→ Pet` in any type selector to point at a co
 
 Constructs the form doesn't edit (`allOf`/`oneOf`/`anyOf`/`not`, shared parameters and responses, security schemes, callbacks...) are shown read-only with a link to the text editor, and are never modified. Swagger 2.0 files are detected and left to the text editor.
 
-**SDD OpenAPI: Open API Specs Overview** opens the catalog page of all OpenAPI documents of the workspace (see [Spec catalogs](#spec-catalogs)). Any `.yaml`, `.yml` or `.json` file declaring `openapi:` (or `swagger:`) is listed, whatever its name. Each row shows the title, version, operation and schema counts, the number of problems, and flags Swagger 2.0 files. Moving a spec that references other files with relative `$ref`s asks for confirmation first, because those references are not updated.
+**SDD OpenAPI: API Specifications** opens the catalog page of all OpenAPI documents of the workspace (see [Spec catalogs](#spec-catalogs)). Any `.yaml`, `.yml` or `.json` file declaring `openapi:` (or `swagger:`) is listed, whatever its name. Each row shows the title, version, operation and schema counts, the number of problems, and flags Swagger 2.0 files. Moving a spec that references other files with relative `$ref`s asks for confirmation first, because those references are not updated.
 
 **SDD OpenAPI: New OpenAPI Specification** creates a starter `<slug>.openapi.yaml` (or JSON) from an API name.
 
@@ -101,7 +121,7 @@ Both **AsyncAPI 2.x** (2.0–2.6) and **3.0** are supported; the form adapts to 
 
 Payloads in other schema formats (Avro, RAML...), `oneOf` messages and other components (security schemes, bindings, traits...) are shown read-only and kept as they are. AsyncAPI 1.x files are left to the text editor.
 
-**SDD AsyncAPI: Open AsyncAPI Specs Overview** lists every AsyncAPI document of the workspace (see [Spec catalogs](#spec-catalogs)), and **SDD AsyncAPI: New AsyncAPI Specification** creates a starter 3.0 `<slug>.asyncapi.yaml`.
+**SDD AsyncAPI: AsyncAPI Specifications** lists every AsyncAPI document of the workspace (see [Spec catalogs](#spec-catalogs)), and **SDD AsyncAPI: New AsyncAPI Specification** creates a starter 3.0 `<slug>.asyncapi.yaml`.
 
 Settings:
 
@@ -133,7 +153,7 @@ proto3, proto2 and editions files are read. The sidebar lists services with thei
 
 Groups, `extend` blocks, extension ranges and custom options (for example `(google.api.http)`) are shown read-only and kept; their line opens in the text editor. Renames only update the edited file: other files importing a renamed type must be updated separately.
 
-**SDD gRPC: Open Proto Files Overview** lists every `.proto` file of the workspace (see [Spec catalogs](#spec-catalogs)), and **SDD gRPC: New Proto File** creates a starter proto3 `<name>.proto` with a service, one RPC and its messages.
+**SDD gRPC: gRPC / Protobuf Files** lists every `.proto` file of the workspace (see [Spec catalogs](#spec-catalogs)), and **SDD gRPC: New Proto File** creates a starter proto3 `<name>.proto` with a service, one RPC and its messages.
 
 Settings:
 
@@ -161,7 +181,7 @@ The number of values uses plain choices: exactly one (the default, no `arity` wr
 
 **Older drafts:** files that put the root command fields (`options`, `commands`...) at the top level, as OpenCLI drafts before April 2026 did, are edited in place. The General page offers **Move them into command** to switch to the current layout. The conventions separator is written as `optionSeparator` (the JSON schema name) unless the file already uses `optionArgumentSeparator` (the name in the specification text).
 
-**SDD OpenCLI: Open CLI Specs Overview** lists every OpenCLI description of the workspace (see [Spec catalogs](#spec-catalogs)), and **SDD OpenCLI: New CLI Specification (OpenCLI)** creates a starter `<slug>.opencli.json` with `--help`, `--version`, exit codes and an example.
+**SDD OpenCLI: CLI Specifications** lists every OpenCLI description of the workspace (see [Spec catalogs](#spec-catalogs)), and **SDD OpenCLI: New CLI Specification (OpenCLI)** creates a starter `<slug>.opencli.json` with `--help`, `--version`, exit codes and an example.
 
 Settings:
 
@@ -249,7 +269,7 @@ Extends: [Data storage](./data-storage.spec.md), [Audit logging](./audit-logging
 
 **Checks:** missing title, several level-1 headings, several Context or Requirements sections (only the first is edited), groups with the same name, empty requirements, requirements without a key word in capitals (with a hint when it is written in lowercase, which RFC 8174 excludes), the same requirement listed twice, empty or repeated examples, an Extends line naming the same spec twice or pointing to something that is not a markdown file, and, in the form, specs extended that cannot be read, a requirement that repeats an inherited one and two specs extended that disagree.
 
-**SDD Specs: Open Specs Overview** lists the specs of the workspace (see [Spec catalogs](#spec-catalogs)), and **SDD Specs: New Spec (Markdown)** asks for the name of the system or component and creates `<slug>.spec.md` holding only its title.
+**SDD Specs: Specs** lists the specs of the workspace (see [Spec catalogs](#spec-catalogs)), and **SDD Specs: New Spec (Markdown)** asks for the name of the system or component and creates `<slug>.spec.md` holding only its title.
 
 Settings:
 
@@ -282,7 +302,7 @@ The outline lists the **project** and every element of the model. Each element h
 
 **Checks:** missing required fields (OTM version, project name and id, element ids, names, component types, parents, dataflow ends), ids used twice, trust zone and component sharing an id, references to missing trust zones, components, assets, threats, mitigations or representations, parents forming a loop, risk values outside 0–100, threats or mitigations without a state, dataflows going to themselves, and warnings for assets, threats and mitigations that nothing uses and CWEs not written `CWE-<number>`.
 
-**SDD Threat Model: Open Threat Models Overview** lists the threat models of the workspace (see [Spec catalogs](#spec-catalogs)), and **SDD Threat Model: New Threat Model (OTM)** asks for the name of the system and creates `<slug>.otm.yaml` with the project and empty lists of elements.
+**SDD Threat Model: Threat Models** lists the threat models of the workspace (see [Spec catalogs](#spec-catalogs)), and **SDD Threat Model: New Threat Model (OTM)** asks for the name of the system and creates `<slug>.otm.yaml` with the project and empty lists of elements.
 
 Settings:
 
@@ -314,7 +334,7 @@ The **Overview** page lists every object by kind, with a table of Services and t
 
 **Checks:** `apiVersion` other than `openslo/v1`, unknown kind, missing `metadata.name`, a name used twice by the same kind, missing `spec`, an SLO without a service, a valid indicator (`indicatorRef` or inline), a budgeting method, at least one time window and one objective, an SLI without a ratio or threshold metric (and their metric source type), a DataSource without a type, an AlertCondition without a condition kind, threshold or lookback window, an AlertNotificationTarget without a target, and references (`service`, `indicatorRef`, `alertPolicies`, `conditions`, `notificationTargets`) that don't match any object of the file.
 
-**SDD OpenSLO: Open OpenSLO Files Overview** lists the OpenSLO files of the workspace (see [Spec catalogs](#spec-catalogs)), and **SDD OpenSLO: New OpenSLO File** asks for the name of the service and creates `<slug>.openslo.yaml` with a Service and an SLO with an inline ratio SLI.
+**SDD OpenSLO: Service Level Objectives** lists the OpenSLO files of the workspace (see [Spec catalogs](#spec-catalogs)), and **SDD OpenSLO: New OpenSLO File** asks for the name of the service and creates `<slug>.openslo.yaml` with a Service and an SLO with an inline ratio SLI.
 
 Settings:
 
@@ -449,7 +469,7 @@ Samples exported from `samples/catalog/online-shop.catalog-info.yaml`: `samples/
 - New entities go to the file of the page they are created from (a data asset created from a component goes to the component's file). The outline **+** has a file choice, and the **Catalog files** section of the overview says where entities created from the overview go, lists the entity and problem counts of each file, and creates new catalog files.
 - Edits are written to the file of each entity (only the entities concerned are rewritten) and saved right away, except in files that already had unsaved changes, which are left for you to save. Changes made to the files elsewhere (text editor, git, new files) show up in the view. A file with syntax errors is reported and its entities are left out until it is fixed.
 
-**SDD Software Catalog: Open Software Catalog Overview** lists the catalog files of the workspace (see [Spec catalogs](#spec-catalogs)), and **SDD Software Catalog: New Catalog File (Backstage)** asks for the name of a system and creates `<slug>.catalog-info.yaml` with that system.
+**SDD Software Catalog: Software Catalog** lists the catalog files of the workspace (see [Spec catalogs](#spec-catalogs)), and **SDD Software Catalog: New Catalog File (Backstage)** asks for the name of a system and creates `<slug>.catalog-info.yaml` with that system.
 
 Settings:
 
@@ -559,7 +579,7 @@ Settings:
 
 ## Spec catalogs
 
-Each module has a catalog page listing its specs: **Features**, **API Specifications** (OpenAPI), **AsyncAPI Specifications**, **gRPC / Protobuf Files**, **CLI Specifications** (OpenCLI), **Specs** (markdown), **Threat Models** (OTM), **OpenSLO Files** and **Software Catalog** (Backstage). The **SDD Studio** menu in the Explorer title bar opens them.
+Each module has a catalog page listing its specs: **Features**, **API Specifications** (OpenAPI), **AsyncAPI Specifications**, **gRPC / Protobuf Files**, **CLI Specifications** (OpenCLI), **Specs** (markdown), **Threat Models** (OTM), **Service Level Objectives** (OpenSLO), **Decisions** (ADRs) and **Software Catalog** (Backstage). The [home page](#home-page) and the **SDD Studio** menu in the Explorer title bar open them, each under the name of its page.
 
 - **Browse:** specs are grouped by folder, with their name, tags, key facts, problems and syntax errors. The filter matches names, paths and tags. Click a spec to open it in its visual editor.
 - **Create:** type a name. The file name is generated as a slug (`Checkout with a credit card` → `checkout-with-a-credit-card.feature`, `Orders API` → `orders-api.openapi.yaml`, `Order events` → `order-events.asyncapi.yaml`, `Acme deploy tool` → `acme-deploy-tool.opencli.json`, `Payment service` → `payment-service.spec.md`, `Online shop` → `online-shop.otm.yaml` or `online-shop.catalog-info.yaml`, `Checkout service` → `checkout-service.openslo.yaml`, and with underscores for proto files: `Order service` → `order_service.proto`) and can still be edited. For OpenAPI, AsyncAPI, OpenCLI and threat models, choose YAML or JSON. Pick an existing folder or type a new path, which is created for you.
@@ -661,6 +681,13 @@ src/
       core/prompts.ts           prompts for a new system, spec updates and implementation, referring to the MCP tools
       host/PromptsPanel.ts      prompt page: catalog entities, copy, open as document, MCP status
       webview/                  React UI: tabs, new system form with assets, entity picker, prompt preview
+    studio/
+      index.ts                  module entry: home page and view commands
+      core/home.ts              order of the kinds on the page, core/protocol.ts: its messages
+      host/kinds.ts             counts and problems of every registered spec index, opening the catalog page of a kind
+      host/StudioPanel.ts       home page: the catalog, every kind of spec and the AI assistant pages
+      host/StudioTreeView.ts    SDD Studio views of the Activity Bar: the home button, the documents (every kind unfolding to its files) and the other pages
+      webview/                  React UI: hero, cards per kind with what the workspace holds
     backstage/
       index.ts                  module entry: form editor with the multi-document YAML engine, commands
       core/model.ts             entity kinds, entity references, relative paths, hierarchy, specs and threat models of an entity, network placements, source locations

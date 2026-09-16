@@ -39,6 +39,7 @@ const builds = [
       openslo: 'src/modules/openslo/webview/main.tsx',
       prompts: 'src/modules/prompts/webview/main.tsx',
       adr: 'src/modules/adr/webview/main.tsx',
+      studio: 'src/modules/studio/webview/main.tsx',
     },
     outdir: 'dist/webview',
     platform: 'browser',

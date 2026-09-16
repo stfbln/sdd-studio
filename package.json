@@ -70,7 +70,8 @@
     "onWebviewPanel:sdd.openslo.specsOverview",
     "onStartupFinished",
     "onWebviewPanel:sdd.prompts.panel",
-    "onWebviewPanel:sdd.adr.decisionsOverview"
+    "onWebviewPanel:sdd.adr.decisionsOverview",
+    "onWebviewPanel:sdd.studio.home"
   ],
   "contributes": {
     "customEditors": [
@@ -241,7 +242,7 @@
     "commands": [
       {
         "command": "sdd.gherkin.openFeaturesOverview",
-        "title": "Open Features Overview",
+        "title": "Features",
         "category": "SDD Gherkin",
         "icon": "$(checklist)"
       },
@@ -265,7 +266,7 @@
       },
       {
         "command": "sdd.openapi.openSpecsOverview",
-        "title": "Open API Specs Overview",
+        "title": "API Specifications",
         "category": "SDD OpenAPI",
         "icon": "$(json)"
       },
@@ -289,7 +290,7 @@
       },
       {
         "command": "sdd.asyncapi.openSpecsOverview",
-        "title": "Open AsyncAPI Specs Overview",
+        "title": "AsyncAPI Specifications",
         "category": "SDD AsyncAPI",
         "icon": "$(broadcast)"
       },
@@ -313,7 +314,7 @@
       },
       {
         "command": "sdd.proto.openSpecsOverview",
-        "title": "Open Proto Files Overview",
+        "title": "gRPC / Protobuf Files",
         "category": "SDD gRPC",
         "icon": "$(symbol-interface)"
       },
@@ -337,7 +338,7 @@
       },
       {
         "command": "sdd.opencli.openSpecsOverview",
-        "title": "Open CLI Specs Overview",
+        "title": "CLI Specifications",
         "category": "SDD OpenCLI",
         "icon": "$(terminal)"
       },
@@ -361,7 +362,7 @@
       },
       {
         "command": "sdd.spec.openSpecsOverview",
-        "title": "Open Specs Overview",
+        "title": "Specs",
         "category": "SDD Specs",
         "icon": "$(book)"
       },
@@ -385,7 +386,7 @@
       },
       {
         "command": "sdd.otm.openThreatModelsOverview",
-        "title": "Open Threat Models Overview",
+        "title": "Threat Models",
         "category": "SDD Threat Model",
         "icon": "$(shield)"
       },
@@ -409,7 +410,7 @@
       },
       {
         "command": "sdd.backstage.openCatalogOverview",
-        "title": "Open Software Catalog Overview",
+        "title": "Software Catalog",
         "category": "SDD Software Catalog",
         "icon": "$(type-hierarchy)"
       },
@@ -439,7 +440,7 @@
       },
       {
         "command": "sdd.openslo.openSpecsOverview",
-        "title": "Open OpenSLO Files Overview",
+        "title": "Service Level Objectives",
         "category": "SDD OpenSLO",
         "icon": "$(target)"
       },
@@ -460,6 +461,18 @@
         "title": "New OpenSLO File",
         "category": "SDD OpenSLO",
         "icon": "$(new-file)"
+      },
+      {
+        "command": "sdd.studio.open",
+        "title": "Open SDD Studio",
+        "category": "SDD Studio",
+        "icon": "$(library)"
+      },
+      {
+        "command": "sdd.studio.openOverview",
+        "title": "Open Page",
+        "category": "SDD Studio",
+        "icon": "$(open-preview)"
       },
       {
         "command": "sdd.addUpdateInstructions",
@@ -493,7 +506,7 @@
       },
       {
         "command": "sdd.adr.openDecisionsOverview",
-        "title": "Open Decisions Overview",
+        "title": "Decisions",
         "category": "SDD ADRs",
         "icon": "$(notebook)"
       },
@@ -743,6 +756,10 @@
       ],
       "commandPalette": [
         {
+          "command": "sdd.studio.openOverview",
+          "when": "false"
+        },
+        {
           "command": "sdd.gherkin.openVisualEditor",
           "when": "resourceExtname == .feature"
         },
@@ -828,100 +845,76 @@
           "submenu": "sdd.explorerMenu",
           "when": "view == workbench.explorer.fileView",
           "group": "navigation@9"
+        },
+        {
+          "command": "sdd.studio.open",
+          "when": "view == sdd.studio.home",
+          "group": "navigation@1"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "sdd.studio.openOverview",
+          "when": "view == sdd.studio.documents && viewItem == sddKind",
+          "group": "inline"
         }
       ],
       "sdd.explorerMenu": [
         {
-          "command": "sdd.gherkin.openFeaturesOverview",
-          "group": "1_pages@1"
+          "command": "sdd.studio.open",
+          "group": "0_home@1"
         },
         {
-          "command": "sdd.openapi.openSpecsOverview",
-          "group": "1_pages@2"
-        },
-        {
-          "command": "sdd.asyncapi.openSpecsOverview",
-          "group": "1_pages@3"
-        },
-        {
-          "command": "sdd.gherkin.newFeature",
-          "group": "2_create@1"
-        },
-        {
-          "command": "sdd.openapi.newSpec",
-          "group": "2_create@2"
-        },
-        {
-          "command": "sdd.asyncapi.newSpec",
-          "group": "2_create@3"
-        },
-        {
-          "command": "sdd.proto.openSpecsOverview",
-          "group": "1_pages@4"
-        },
-        {
-          "command": "sdd.proto.newSpec",
-          "group": "2_create@4"
-        },
-        {
-          "command": "sdd.opencli.openSpecsOverview",
-          "group": "1_pages@5"
-        },
-        {
-          "command": "sdd.opencli.newSpec",
-          "group": "2_create@5"
-        },
-        {
-          "command": "sdd.spec.openSpecsOverview",
-          "group": "1_pages@6"
-        },
-        {
-          "command": "sdd.spec.newSpec",
-          "group": "2_create@6"
-        },
-        {
-          "command": "sdd.otm.openThreatModelsOverview",
-          "group": "1_pages@7"
-        },
-        {
-          "command": "sdd.otm.newSpec",
-          "group": "2_create@7"
-        },
-        {
-          "command": "sdd.backstage.openCatalogOverview",
-          "group": "1_pages@8"
-        },
-        {
-          "command": "sdd.backstage.newCatalogFile",
-          "group": "2_create@8"
+          "command": "sdd.prompts.open",
+          "group": "1_workspace@1"
         },
         {
           "command": "sdd.backstage.openConsolidatedCatalog",
-          "group": "1_pages@9"
+          "group": "1_workspace@2"
+        },
+        {
+          "command": "sdd.backstage.openCatalogOverview",
+          "group": "2_pages@1"
+        },
+        {
+          "command": "sdd.spec.openSpecsOverview",
+          "group": "2_pages@2"
+        },
+        {
+          "command": "sdd.gherkin.openFeaturesOverview",
+          "group": "2_pages@3"
+        },
+        {
+          "command": "sdd.openapi.openSpecsOverview",
+          "group": "2_pages@4"
+        },
+        {
+          "command": "sdd.asyncapi.openSpecsOverview",
+          "group": "2_pages@5"
+        },
+        {
+          "command": "sdd.proto.openSpecsOverview",
+          "group": "2_pages@6"
+        },
+        {
+          "command": "sdd.opencli.openSpecsOverview",
+          "group": "2_pages@7"
+        },
+        {
+          "command": "sdd.otm.openThreatModelsOverview",
+          "group": "2_pages@8"
         },
         {
           "command": "sdd.openslo.openSpecsOverview",
-          "group": "1_pages@10"
-        },
-        {
-          "command": "sdd.openslo.newSpec",
-          "group": "2_create@9"
+          "group": "2_pages@9"
         },
         {
           "command": "sdd.adr.openDecisionsOverview",
-          "group": "1_pages@11"
-        },
-        {
-          "command": "sdd.adr.newSpec",
-          "group": "2_create@10"
+          "group": "2_pages@10"
         },
         {
           "command": "sdd.addUpdateInstructionsToWorkspace",
           "group": "3_instructions@1"
-        },
-        {
-          "command": "sdd.prompts.open",
-          "group": "0_prompts@1"
         }
       ]
     },
@@ -1037,6 +1030,50 @@
         "id": "sdd.explorerMenu",
         "label": "SDD Studio",
         "icon": "$(library)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "sdd-studio",
+          "title": "SDD Studio",
+          "icon": "media/sdd-studio.svg"
+        }
+      ]
+    },
+    "views": {
+      "sdd-studio": [
+        {
+          "id": "sdd.studio.home",
+          "name": "Home",
+          "contextualTitle": "SDD Studio",
+          "icon": "media/sdd-studio.svg",
+          "initialSize": 1
+        },
+        {
+          "id": "sdd.studio.documents",
+          "name": "Documents",
+          "contextualTitle": "SDD Studio",
+          "icon": "media/sdd-studio.svg",
+          "initialSize": 8
+        },
+        {
+          "id": "sdd.studio.misc",
+          "name": "Miscellaneous",
+          "contextualTitle": "SDD Studio",
+          "icon": "media/sdd-studio.svg",
+          "initialSize": 2
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "sdd.studio.home",
+        "contents": "[Open SDD Studio](command:sdd.studio.open)\nThe catalog, every kind of spec and the pages for AI assistants, in one page."
+      },
+      {
+        "view": "sdd.studio.documents",
+        "contents": "Open a folder or workspace to work on its specs.\n[Open Folder](command:vscode.openFolder)"
       }
     ],
     "mcpServerDefinitionProviders": [
