@@ -1,22 +1,28 @@
 import { baseName } from '../../../shared/files';
-import { CONFORMANCE_NOTICE } from './keywords';
+import { DEFAULT_KEYWORD_ICONS, findKeyword, KEYWORDS, levelHeading, levelIntro, levelRank, WRITTEN_NOTICE, type Keyword, type KeywordIcons } from './keywords';
 import {
   blockText,
   EXAMPLE_LABEL,
+  exampleTitle,
   fencedLines,
   isBlank,
   parseSpecMarkdown,
   scanFences,
   splitLines,
-  type Example,
-  type Requirement,
   type RequirementList,
+  type Section,
   type SpecModel,
 } from './parse';
 
 /**
- * Changes the form makes to a markdown spec. Each one rewrites only the lines concerned; a section
- * is written when it gets content and removed when it no longer has any. Groups stay until deleted.
+ * Changes the form makes to a markdown spec. The title, Extends line, description and context are
+ * changed on the lines concerned. The Requirements section is written back as a whole, in the
+ * layout of key word headings: a `####` heading per key word (with its icon), a `#####` heading per
+ * requirement, with its description and "**Title**\" examples under it. Whatever the change, a section
+ * written in an older layout is rewritten in this one; one already in it only changes on the lines
+ * concerned.
+ * A section is written when it gets content and removed when it no longer has any. Groups stay until
+ * deleted.
  */
 export type SpecEdit =
   /** An empty value removes the title. */
@@ -27,15 +33,20 @@ export type SpecEdit =
   | { op: 'setContext'; value: string }
   /** The BCP 14 sentence at the start of the Requirements section. */
   | { op: 'setNotice'; enabled: boolean }
-  /** Appends by default. */
+  /** Written under the heading of its key word, created when missing; last of its key word by default. */
   | { op: 'addRequirement'; group: ListRef; text: string; index?: number }
+  /** The sentence, on one line: when it takes another key word, the requirement moves under the heading of that key word. */
   | { op: 'setRequirement'; group: ListRef; index: number; text: string }
+  /** Description (details, rationale) written between the sentence and the examples; empty removes it. */
+  | { op: 'setRequirementDescription'; group: ListRef; index: number; text: string }
   | { op: 'deleteRequirement'; group: ListRef; index: number }
-  /** `toIndex` is the position in the target list once moved (appends when omitted). */
+  /** `toIndex` is the position in the target list once moved, within its key word (last of its key word when omitted). */
   | { op: 'moveRequirement'; group: ListRef; index: number; toGroup: ListRef; toIndex?: number }
-  /** Example scenarios of one requirement: nested "- Example: ..." items under it. Appends by default. */
-  | { op: 'addExample'; group: ListRef; index: number; text: string; at?: number }
+  /** Example scenarios of one requirement: "**Title**\" with the case on the next line. Appends by default. */
+  | { op: 'addExample'; group: ListRef; index: number; text: string; title?: string; at?: number }
   | { op: 'setExample'; group: ListRef; index: number; example: number; text: string }
+  /** An empty title numbers the example instead ("**Example 2**"). */
+  | { op: 'setExampleTitle'; group: ListRef; index: number; example: number; title: string }
   | { op: 'deleteExample'; group: ListRef; index: number; example: number }
   | { op: 'moveExample'; group: ListRef; index: number; example: number; to: number }
   /** Appended after the other groups, with its first requirement when `text` is given. */
@@ -73,46 +84,139 @@ export function normalizeBlock(value: string): string {
   return lines.map((l, i) => (inFence[i] ? l : l.replace(/^( {0,3})(#{1,2})(?=[ \t]|$)/, '$1\\$2'))).join('\n');
 }
 
-export const normalizeRequirement = (value: string) => {
-  const text = value.replace(/\r\n?/g, '\n').replace(/^\s+/, '').replace(/\s+$/, '');
-  return text && closeFences(text);
-};
+/** A requirement is the text of a heading: one line. */
+export const normalizeRequirement = (value: string) => normalizeTitle(value);
 
-/** An example is written under its requirement, so its own "Example:" label is not repeated. */
-export const normalizeExample = (value: string) => normalizeRequirement(value).replace(EXAMPLE_LABEL, '');
-
-/** Wraps a text under a list marker: "- <first>", continuation lines aligned with it. */
-function renderLines(indent: string, marker: string, prefix: string, text: string): string[] {
-  const [first, ...rest] = text.split('\n');
-  const inner = indent + ' '.repeat(marker.length + 1);
-  return [`${indent}${marker} ${prefix}${first}`.trimEnd(), ...rest.map((l) => (l.trim() ? inner + l : ''))];
+/**
+ * Text written under a requirement: heading lines are escaped so they stay inside it, and so are
+ * lines in bold or italics starting a paragraph, which would start an example. `paragraph` tells
+ * whether the first line starts a paragraph (a description does, the case under an example title
+ * does not).
+ */
+function normalizeInside(value: string, paragraph: boolean): string {
+  const text = closeFences(value.replace(/\r\n?/g, '\n').replace(/^([ \t]*\n)+/, '').replace(/\s+$/, ''));
+  if (!text) return '';
+  const lines = text.split('\n');
+  const inFence = fencedLines(lines);
+  return lines
+    .map((line, i) => {
+      if (inFence[i]) return line;
+      const escaped = line.replace(/^( {0,3})(#{1,6})(?=[ \t]|$)/, '$1\\$2');
+      const starts = i === 0 ? paragraph : isBlank(lines[i - 1]);
+      return starts && exampleTitle(escaped) !== undefined ? escaped.replace(/^( {0,3})([*_])/, '$1\\$2') : escaped;
+    })
+    .join('\n');
 }
 
-/** "  - Example: ..." under a requirement whose text starts at column `indent`. */
-function renderExample(indent: number, marker: string, text: string): string[] {
-  return renderLines(' '.repeat(indent), marker, 'Example: ', text);
+export const normalizeRequirementDescription = (value: string) => normalizeInside(value, true);
+
+/** The case of an example, written under its title, so an "Example:" label typed in front of it is not kept. */
+export const normalizeExample = (value: string) => normalizeInside(value.replace(/^\s+/, '').replace(EXAMPLE_LABEL, ''), false);
+
+/** A title in bold on one line; "Example 2" is the title of an example without one. */
+export function normalizeExampleTitle(value: string): string {
+  const text = normalizeTitle(value).replace(/\*/g, '').replace(/[\\\s]+$/, '');
+  return (text && exampleTitle(`*${text}*`)) || '';
 }
 
-function renderItem(marker: string, checkbox: string, text: string, examples: string[] = [], exampleMarker = '-'): string[] {
-  const lines = renderLines('', marker, checkbox, text);
-  for (const example of examples) lines.push(...renderExample(marker.length + 1, exampleMarker, example));
-  return lines;
+/** Requirements are written level by level, in the order they are listed inside each level. */
+export function sortByLevel<T extends { level?: Keyword }>(items: T[]): T[] {
+  return items
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => levelRank(a.item.level) - levelRank(b.item.level) || a.index - b.index)
+    .map(({ item }) => item);
 }
 
-/** Marker for an item inserted at `index`, following the style of the list. */
-function markerAt(items: Requirement[], index: number): string {
-  const reference = items[Math.min(index, items.length) - 1] ?? items[0];
-  if (!reference) return '-';
-  const ordered = /^(\d+)([.)])$/.exec(reference.marker);
-  if (!ordered) return reference.marker;
-  return reference === items[index - 1] ? `${Number(ordered[1]) + 1}${ordered[2]}` : reference.marker;
+/** What the Requirements section holds, as it is written back. */
+interface RequirementContent {
+  text: string;
+  checkbox: string;
+  description: string;
+  level?: Keyword;
+  examples: { title: string; text: string }[];
+}
+
+interface ListContent {
+  notes: string;
+  items: RequirementContent[];
+  /** The text under the `####` headings, and the headings naming no level, as written. */
+  levels: { keyword?: Keyword; customHeading?: string; intro: string }[];
+}
+
+interface SectionContent {
+  notice?: string;
+  list: ListContent;
+  /** `heading` is the `###` line as written. */
+  groups: (ListContent & { heading: string })[];
+}
+
+function listContent(lines: string[], list: RequirementList): ListContent {
+  return {
+    notes: list.notes,
+    items: list.items.map(({ text, checkbox, description, level, examples }) => ({ text, checkbox, description, level, examples: examples.map(({ title, text }) => ({ title, text })) })),
+    levels: list.levels.map(({ keyword, heading, customHeading, intro }) => ({ keyword, customHeading: heading && customHeading ? lines[heading.line] : undefined, intro })),
+  };
+}
+
+function sectionContent(lines: string[], model: SpecModel): SectionContent {
+  const requirements = model.requirements;
+  if (!requirements) return { notice: WRITTEN_NOTICE, list: { notes: '', items: [], levels: [] }, groups: [] };
+  return {
+    notice: requirements.notice?.text,
+    list: listContent(lines, requirements.list),
+    groups: requirements.groups.map((group) => ({ heading: lines[group.heading.line], ...listContent(lines, group) })),
+  };
+}
+
+/** "##### The service MUST ...": closing #s of the sentence are kept by closing the heading. */
+function requirementHeading({ checkbox, text }: RequirementContent): string {
+  const sentence = `${checkbox}${text}`;
+  return `##### ${sentence}${/(^|[ \t])#+$/.test(sentence) ? ' #' : ''}`.trimEnd();
+}
+
+/** "**Card declined**\" with the case on the next line: the backslash breaks the line once rendered. */
+function exampleBlock({ title, text }: { title: string; text: string }, index: number): string {
+  const heading = `**${title || `Example ${index + 1}`}**`;
+  return text ? `${heading}\\\n${text}` : heading;
+}
+
+/** Blocks of a list, to be separated by blank lines: notes, then each level with its requirements. */
+function listBlocks(list: ListContent, icons: KeywordIcons): string[] {
+  const blocks = list.notes ? [list.notes] : [];
+  for (let rank = 0; rank <= KEYWORDS.length; rank++) {
+    const keyword = KEYWORDS[rank] as Keyword | undefined;
+    const items = list.items.filter((item) => levelRank(item.level) === rank);
+    const level = list.levels.find((l) => levelRank(l.keyword) === rank);
+    const intro = level ? level.intro : levelIntro(keyword);
+    if (!items.length && (!intro || intro === levelIntro(keyword))) continue;
+    blocks.push(level?.customHeading ?? levelHeading(keyword, icons));
+    if (intro) blocks.push(intro);
+    for (const item of items) {
+      blocks.push(requirementHeading(item));
+      if (item.description) blocks.push(item.description);
+      blocks.push(...item.examples.map(exampleBlock));
+    }
+  }
+  return blocks;
+}
+
+function sectionLines(content: SectionContent, icons: KeywordIcons): string[] {
+  const blocks = [
+    ...(content.notice ? [content.notice] : []),
+    ...listBlocks(content.list, icons),
+    ...content.groups.flatMap((group) => [group.heading, ...listBlocks(group, icons)]),
+  ];
+  return blocks.length ? blocks.join('\n\n').split('\n') : [];
 }
 
 class Lines {
   lines: string[];
   private readonly trailingNewline: boolean;
 
-  constructor(text: string) {
+  constructor(
+    text: string,
+    readonly icons: KeywordIcons,
+  ) {
     this.lines = text ? splitLines(text) : [];
     // A new, empty file gets a final newline like the others.
     this.trailingNewline = !text || /\n$/.test(text);
@@ -212,87 +316,166 @@ function setContext(doc: Lines, value: string) {
   }
 }
 
-/** Removes the Requirements section when it has no requirement, group or note left. */
-function cleanUp(doc: Lines) {
-  const requirements = doc.model.requirements;
-  if (requirements && !requirements.list.items.length && !requirements.list.otherContent && !requirements.groups.length) {
-    doc.removeBlock(requirements.section.heading.line, requirements.section.end);
+/** Writes the Requirements section back, or creates it (after Context, or the description), or removes it when `removeEmpty` and it has nothing left. */
+function writeSection(doc: Lines, section: Section | undefined, content: SectionContent, removeEmpty = false) {
+  const body = sectionLines(content, doc.icons);
+  if (!section) {
+    const model = doc.model;
+    return doc.insertBlock(model.context ? model.context.section.end : model.description.end, ['## Requirements', '', ...body]);
   }
+  // A notice alone does not keep the section.
+  if (removeEmpty && !content.groups.length && !listBlocks(content.list, doc.icons).length) return doc.removeBlock(section.heading.line, section.end);
+  const replacement = [...(body.length ? ['', ...body] : []), ...(section.end < doc.lines.length ? [''] : [])];
+  if (doc.lines.slice(section.heading.line + 1, section.end).join('\n') !== replacement.join('\n')) doc.replace(section.heading.line + 1, section.end, replacement);
 }
 
-/** Lines of a group from its heading to its last non-blank line. */
-function groupLines(doc: Lines, group: number): { start: number; end: number } {
-  const found = doc.model.requirements?.groups[group];
-  if (!found) throw new Error('This group of requirements no longer exists in the file.');
-  let end = found.end;
-  while (end > found.heading.line + 1 && isBlank(doc.lines[end - 1])) end--;
-  return { start: found.heading.line, end };
+const missingGroup = () => new Error('This group of requirements no longer exists in the file.');
+
+function listIn(content: SectionContent, ref: ListRef): ListContent {
+  const list = ref === null ? content.list : content.groups[ref];
+  if (!list) throw missingGroup();
+  return list;
 }
 
-function moveGroup(doc: Lines, group: number, toIndex: number) {
-  const count = doc.model.requirements?.groups.length ?? 0;
-  const { start, end } = groupLines(doc, group);
-  const target = Math.max(0, Math.min(toIndex, count - 1));
-  if (target === group) return;
-  const block = doc.lines.slice(start, end);
-  doc.removeBlock(start, doc.model.requirements!.groups[group].end);
-  if (target < count - 1) return doc.insertBlock(doc.model.requirements!.groups[target].heading.line, block);
-  doc.insertBlock(groupLines(doc, count - 2).end, block);
-}
-
-/** A new Requirements section, placed after Context (or the description). */
-function insertSection(doc: Lines, block: string[]) {
-  const model = doc.model;
-  const at = model.context ? model.context.section.end : model.description.end;
-  doc.insertBlock(at, ['## Requirements', '', CONFORMANCE_NOTICE, '', ...block]);
-}
-
-function addRequirement(doc: Lines, ref: ListRef, value: string, index?: number, checkbox = '', forceLoose?: boolean, examples: string[] = []) {
-  const model = doc.model;
-  const text = normalizeRequirement(value);
-  if (!model.requirements && ref === null) return insertSection(doc, renderItem('-', checkbox, text, examples));
-  const list = listOf(model, ref);
-  if (!list) throw new Error('This group of requirements no longer exists in the file.');
-
-  const { items } = list;
-  const position = Math.max(0, Math.min(index ?? items.length, items.length));
-  const block = renderItem(markerAt(items, position), checkbox, text, examples);
-  const loose = forceLoose ?? list.loose;
-  if (!items.length) {
-    // After the notes of the list (or the conformance sentence), before the next group.
-    let last = list.end - 1;
-    while (last >= list.start && isBlank(doc.lines[last])) last--;
-    doc.insertBlock(last + 1, block);
-  } else if (position < items.length) {
-    doc.replace(items[position].line, items[position].line, loose ? [...block, ''] : block);
-  } else {
-    const end = items[items.length - 1].end;
-    doc.replace(end, end, loose ? ['', ...block] : block);
-  }
-}
-
-/** The requirement an example edit is about, with the list holding it. */
-function requirementOf(model: SpecModel, group: ListRef, index: number): Requirement {
-  const item = listOf(model, group)?.items[index];
+function requirementIn(list: ListContent, index: number): RequirementContent {
+  const item = list.items[index];
   if (!item) throw new Error(`Requirement ${index + 1} no longer exists in the file.`);
   return item;
 }
 
-function exampleOf(item: Requirement, index: number): Example {
+function exampleIn(item: RequirementContent, index: number) {
   const example = item.examples[index];
   if (!example) throw new Error(`Example ${index + 1} no longer exists in the file.`);
   return example;
 }
 
-function addExample(doc: Lines, group: ListRef, index: number, value: string, at?: number) {
-  const text = normalizeExample(value);
-  if (!text) throw new Error('An example cannot be empty.');
-  const item = requirementOf(doc.model, group, index);
-  const { examples } = item;
-  const position = Math.max(0, Math.min(at ?? examples.length, examples.length));
-  const block = renderExample(item.indent, examples[0]?.marker ?? '-', text);
-  const line = position < examples.length ? examples[position].line : (examples[examples.length - 1]?.end ?? item.bodyEnd);
-  doc.replace(line, line, block);
+const newRequirement = (text: string): RequirementContent => ({ text, checkbox: '', description: '', level: findKeyword(text)?.keyword, examples: [] });
+
+const clamp = (value: number, max: number) => Math.max(0, Math.min(value, max));
+
+/** Applies a change to the requirements and writes the section back, requirements sorted by key word. */
+function changeRequirements(doc: Lines, change: (content: SectionContent, model: SpecModel) => void, options: { create?: boolean; removeEmpty?: boolean } = {}) {
+  const model = doc.model;
+  const section = model.requirements?.section;
+  if (!section && !options.create) return;
+  const content = sectionContent(doc.lines, model);
+  change(content, model);
+  for (const list of [content.list, ...content.groups]) list.items = sortByLevel(list.items);
+  writeSection(doc, section, content, options.removeEmpty);
+}
+
+/** Requirement edits: every one of them writes the section back. */
+function applyToRequirements(doc: Lines, edit: SpecEdit) {
+  switch (edit.op) {
+    case 'setNotice':
+      return changeRequirements(doc, (content) => {
+        content.notice = edit.enabled ? (content.notice ?? WRITTEN_NOTICE) : undefined;
+      });
+    case 'addRequirement': {
+      const text = normalizeRequirement(edit.text);
+      if (!text) throw new Error('A requirement cannot be empty.');
+      return changeRequirements(
+        doc,
+        (content) => {
+          const list = listIn(content, edit.group);
+          list.items.splice(clamp(edit.index ?? list.items.length, list.items.length), 0, newRequirement(text));
+        },
+        { create: edit.group === null },
+      );
+    }
+    case 'setRequirement':
+      return changeRequirements(doc, (content) => {
+        const item = requirementIn(listIn(content, edit.group), edit.index);
+        item.text = normalizeRequirement(edit.text);
+        // Typing keeps the requirement in place until its sentence has another key word.
+        const keyword = findKeyword(item.text)?.keyword;
+        if (keyword) item.level = keyword;
+      });
+    case 'setRequirementDescription':
+      return changeRequirements(doc, (content) => {
+        requirementIn(listIn(content, edit.group), edit.index).description = normalizeRequirementDescription(edit.text);
+      });
+    case 'deleteRequirement':
+      return changeRequirements(
+        doc,
+        (content) => {
+          const list = listIn(content, edit.group);
+          requirementIn(list, edit.index);
+          list.items.splice(edit.index, 1);
+        },
+        { removeEmpty: true },
+      );
+    case 'moveRequirement':
+      return changeRequirements(doc, (content) => {
+        const from = listIn(content, edit.group);
+        const item = requirementIn(from, edit.index);
+        if (edit.toGroup !== null && !content.groups[edit.toGroup]) throw new Error('The target group no longer exists in the file.');
+        const to = listIn(content, edit.toGroup);
+        from.items.splice(edit.index, 1);
+        to.items.splice(clamp(edit.toIndex ?? to.items.length, to.items.length), 0, item);
+      });
+    case 'addExample': {
+      const text = normalizeExample(edit.text);
+      const title = normalizeExampleTitle(edit.title ?? '');
+      if (!text && !title) throw new Error('An example cannot be empty.');
+      return changeRequirements(doc, (content) => {
+        const { examples } = requirementIn(listIn(content, edit.group), edit.index);
+        examples.splice(clamp(edit.at ?? examples.length, examples.length), 0, { title, text });
+      });
+    }
+    case 'setExample':
+      return changeRequirements(doc, (content) => {
+        exampleIn(requirementIn(listIn(content, edit.group), edit.index), edit.example).text = normalizeExample(edit.text);
+      });
+    case 'setExampleTitle':
+      return changeRequirements(doc, (content) => {
+        exampleIn(requirementIn(listIn(content, edit.group), edit.index), edit.example).title = normalizeExampleTitle(edit.title);
+      });
+    case 'deleteExample':
+      return changeRequirements(doc, (content) => {
+        const item = requirementIn(listIn(content, edit.group), edit.index);
+        exampleIn(item, edit.example);
+        item.examples.splice(edit.example, 1);
+      });
+    case 'moveExample':
+      return changeRequirements(doc, (content) => {
+        const { examples } = requirementIn(listIn(content, edit.group), edit.index);
+        const [example] = examples.splice(edit.example, 1);
+        if (!example) throw new Error(`Example ${edit.example + 1} no longer exists in the file.`);
+        examples.splice(clamp(edit.to, examples.length), 0, example);
+      });
+    case 'addGroup': {
+      const name = normalizeTitle(edit.name);
+      const text = normalizeRequirement(edit.text ?? '');
+      if (!name) throw new Error('A group needs a name.');
+      return changeRequirements(doc, (content) => content.groups.push({ heading: `### ${name}`, notes: '', items: text ? [newRequirement(text)] : [], levels: [] }), { create: true });
+    }
+    case 'renameGroup': {
+      const name = normalizeTitle(edit.name);
+      const group = doc.model.requirements?.groups[edit.group];
+      if (!group) throw missingGroup();
+      if (!name) throw new Error('A group needs a name.');
+      // A heading kept as written ("### **Security**") is only rewritten when the name changes.
+      return changeRequirements(doc, (content) => {
+        if (name !== group.heading.text) content.groups[edit.group].heading = `### ${name}`;
+      });
+    }
+    case 'moveGroup':
+      return changeRequirements(doc, (content) => {
+        const [group] = content.groups.splice(edit.group, 1);
+        if (!group) throw missingGroup();
+        content.groups.splice(clamp(edit.toIndex, content.groups.length), 0, group);
+      });
+    case 'deleteGroup':
+      return changeRequirements(
+        doc,
+        (content) => {
+          if (!content.groups[edit.group]) throw missingGroup();
+          content.groups.splice(edit.group, 1);
+        },
+        { removeEmpty: true },
+      );
+  }
 }
 
 function applyOne(doc: Lines, edit: SpecEdit) {
@@ -306,96 +489,21 @@ function applyOne(doc: Lines, edit: SpecEdit) {
       return doc.setBlock(model.description.start, model.description.end, normalizeBlock(edit.value), model.extends ? model.extends.line + 1 : model.title ? model.title.line + 1 : model.bodyStart);
     case 'setContext':
       return setContext(doc, edit.value);
-    case 'setNotice': {
-      const requirements = model.requirements;
-      if (!requirements) return;
-      if (edit.enabled && !requirements.notice) doc.insertBlock(requirements.section.heading.line + 1, [CONFORMANCE_NOTICE]);
-      if (!edit.enabled && requirements.notice) doc.removeBlock(requirements.notice.start, requirements.notice.end);
-      return;
-    }
-    case 'addRequirement':
-      if (!normalizeRequirement(edit.text)) throw new Error('A requirement cannot be empty.');
-      return addRequirement(doc, edit.group, edit.text, edit.index);
-    case 'addExample':
-      return addExample(doc, edit.group, edit.index, edit.text, edit.at);
-    case 'setExample': {
-      const item = requirementOf(model, edit.group, edit.index);
-      const example = exampleOf(item, edit.example);
-      const text = normalizeExample(edit.text);
-      if (text !== example.text) doc.replace(example.line, example.end, renderExample(item.indent, example.marker, text));
-      return;
-    }
-    case 'deleteExample': {
-      const example = exampleOf(requirementOf(model, edit.group, edit.index), edit.example);
-      return doc.removeBlock(example.line, example.end);
-    }
-    case 'moveExample': {
-      const item = requirementOf(model, edit.group, edit.index);
-      const example = exampleOf(item, edit.example);
-      const to = Math.max(0, Math.min(edit.to, item.examples.length - 1));
-      if (to === edit.example) return;
-      doc.removeBlock(example.line, example.end);
-      return addExample(doc, edit.group, edit.index, example.text, to);
-    }
-    case 'addGroup': {
-      const name = normalizeTitle(edit.name);
-      const text = normalizeRequirement(edit.text ?? '');
-      if (!name) throw new Error('A group needs a name.');
-      const block = [`### ${name}`, ...(text ? ['', ...renderItem('-', '', text)] : [])];
-      if (!model.requirements) return insertSection(doc, block);
-      return doc.insertBlock(model.requirements.section.end, block);
-    }
-    case 'renameGroup': {
-      const group = model.requirements?.groups[edit.group];
-      const name = normalizeTitle(edit.name);
-      if (!group) throw new Error('This group of requirements no longer exists in the file.');
-      if (!name) throw new Error('A group needs a name.');
-      if (name !== group.heading.text) doc.replace(group.heading.line, group.heading.line + 1, [`### ${name}`]);
-      return;
-    }
-    case 'moveGroup':
-      return moveGroup(doc, edit.group, edit.toIndex);
-    case 'deleteGroup': {
-      const group = model.requirements?.groups[edit.group];
-      if (!group) throw new Error('This group of requirements no longer exists in the file.');
-      doc.removeBlock(group.heading.line, group.end);
-      return cleanUp(doc);
-    }
-  }
-
-  const list = listOf(model, edit.group);
-  const item = list?.items[edit.index];
-  if (!list || !item) throw new Error(`Requirement ${edit.index + 1} no longer exists in the file.`);
-  switch (edit.op) {
-    case 'setRequirement': {
-      // Only the sentence is rewritten: the examples listed under it stay where they are.
-      const text = normalizeRequirement(edit.text);
-      if (text !== item.text) doc.replace(item.line, item.bodyEnd, renderItem(item.marker, item.checkbox, text));
-      return;
-    }
-    case 'deleteRequirement':
-      doc.removeBlock(item.line, item.end);
-      return cleanUp(doc);
-    case 'moveRequirement': {
-      const same = edit.toGroup === edit.group;
-      if (same && (edit.toIndex ?? list.items.length - 1) === edit.index) return;
-      if (!same && !listOf(model, edit.toGroup)) throw new Error('The target group no longer exists in the file.');
-      doc.removeBlock(item.line, item.end);
-      return addRequirement(
-        doc,
-        edit.toGroup,
-        item.text || ' ',
-        edit.toIndex,
-        item.checkbox,
-        same ? list.loose : undefined,
-        item.examples.map((e) => e.text),
-      );
-    }
+    default:
+      return applyToRequirements(doc, edit);
   }
 }
 
-export function applySpecEdits(text: string, edits: SpecEdit[]): string {
-  const doc = new Lines(text);
+/** How requirements are written: the icons of the key word headings. */
+export interface SpecWriteOptions {
+  icons?: KeywordIcons;
+}
+
+export function applySpecEdits(text: string, edits: SpecEdit[], options: SpecWriteOptions = {}): string {
+  const doc = new Lines(text, options.icons ?? DEFAULT_KEYWORD_ICONS);
   for (const edit of edits) applyOne(doc, edit);
+  // Whatever the change, requirements written in an older layout are rewritten in the current one.
+  const requirements = edits.length ? doc.model.requirements : undefined;
+  if (requirements) writeSection(doc, requirements.section, sectionContent(doc.lines, doc.model));
   return doc.toString();
 }

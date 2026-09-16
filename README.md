@@ -208,16 +208,35 @@ Called by the order service once the customer confirms the basket.
 
 ## Requirements
 
-The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as described in BCP 14 [[RFC2119](https://www.rfc-editor.org/rfc/rfc2119)] [[RFC8174](https://www.rfc-editor.org/rfc/rfc8174)] when, and only when, they appear in all capitals, as shown here.
+*The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as described in BCP 14 [[RFC2119](https://www.rfc-editor.org/rfc/rfc2119)] [[RFC8174](https://www.rfc-editor.org/rfc/rfc8174)] when, and only when, they appear in all capitals, as shown here.*
 
-- The service MUST take card payments through the payment provider's hosted form.
-  - Example: a customer pays a 20 EUR basket with a Visa card and comes back to the shop with the order marked paid.
-  - Example: the provider declines the card; the order stays unpaid.
-- The service SHOULD support Apple Pay and Google Pay.
+#### ✅ MUST
+
+*An absolute requirement of the specification (also written REQUIRED or SHALL).*
+
+##### The service MUST take card payments through the payment provider's hosted form.
+
+Keeps the shop out of the scope of PCI DSS.
+
+**Card accepted**\
+A customer pays a 20 EUR basket with a Visa card and comes back to the shop with the order marked paid.
+
+**Example 2**\
+The provider declines the card; the order stays unpaid.
+
+#### 👍 SHOULD
+
+*Recommended: there may exist valid reasons in particular circumstances to ignore the requirement, but the full implications must be understood and carefully weighed before choosing a different course (also written RECOMMENDED).*
+
+##### The service SHOULD support Apple Pay and Google Pay.
 
 ### Security
 
-- The service MUST NOT store card numbers or security codes.
+#### ⛔ MUST NOT
+
+*An absolute prohibition of the specification (also written SHALL NOT).*
+
+##### The service MUST NOT store card numbers or security codes.
 ```
 
 | Part | Written as |
@@ -226,28 +245,39 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 | Extends | An `Extends: [Title](path)` line right under the title, with the specs separated by commas (see [Specs that extend other specs](#specs-that-extend-other-specs)), removed when the last one goes |
 | Description | The text between the title (or the Extends line) and the first `##` section |
 | Context | A `## Context` section, removed when emptied |
-| Requirements | A `## Requirements` section: the BCP 14 conformance sentence of RFC 8174 (can be turned off), a list of requirements, and optional `###` groups (e.g. Security) with their own lists. A group is written as soon as it is named, even empty, and stays until it is deleted; the section goes when it has no requirement or group left |
-| Examples | A nested list under a requirement, each item written `- Example: <one concrete case>` |
+| Requirements | A `## Requirements` section: the BCP 14 conformance sentence of RFC 8174 in italics (can be turned off), the requirements, and optional `###` groups (e.g. Security) with their own. A group is written as soon as it is named, even empty, and stays until it is deleted; the section goes when it has no requirement or group left |
+| Key words | Under the section, and under each group, a `####` heading per key word in the order MUST, MUST NOT, SHOULD, SHOULD NOT, MAY, its icon first (`#### ✅ MUST`, see `sdd.spec.keywordIcons`), followed by the definition of the key word after RFC 2119 in italics. A heading is written with the first requirement using its key word and goes with the last one; requirements without a key word in capitals come last, under `#### ❔ No key word` |
+| Requirement | A `#####` heading holding the sentence, on one line, under the heading of its key word |
+| Description | The text under the requirement heading, before its examples: details, rationale |
+| Examples | After the description: a title in bold followed by a backslash, which breaks the line once rendered (`**Card accepted**\`, or `**Example 2**\` for an example without a title), the case on the next line, and a blank line between examples |
 
 Inherited requirements are never written to the file: they stay in the spec that states them and the form reads them from there.
 
 **Requirements** are sentences with a key word in capitals: **MUST** / **MUST NOT** (absolute), **SHOULD** / **SHOULD NOT** (recommended, exceptions need a valid reason), **MAY** (optional). The other RFC 2119 words are read as their equivalent (SHALL and REQUIRED as MUST, SHALL NOT as MUST NOT, RECOMMENDED as SHOULD, NOT RECOMMENDED as SHOULD NOT, OPTIONAL as MAY) and kept as written.
 
-- Each row has a **key word picker** next to the sentence: picking a level replaces the key word in the sentence (or a lowercase "must", "should"...). The picker follows what you type.
+- Each row has a **key word picker** next to the sentence: picking a level replaces the key word in the sentence (or a lowercase "must", "should"...) and moves the requirement under the heading of that key word, the keyboard focus following it. The picker follows what you type: typing another key word in the sentence moves it too, while a sentence whose key word is being retyped stays where it is.
 - The **add box** takes a full sentence as typed, or composes one: with MUST selected, `Take card payments` becomes `The service MUST take card payments`, reusing the subject of the last requirement (or the title). A preview shows the sentence before it is added.
-- Requirements can be edited in place (Shift+Enter for a second line), reordered, moved to another group, and deleted. Deleting the text of a requirement and leaving it removes it. Groups can be added (empty, then filled by adding requirements or moving existing ones into them), renamed, reordered and deleted with their content.
+- The form lists the requirements of each group as the file does, under a header per key word with its meaning.
+- Requirements can be edited in place, reordered within their key word, moved to another group (under the same key word there), and deleted. Deleting the text of a requirement and leaving it removes it. While a requirement is being edited, a box to write its **description** and a box to add an example show under it (Shift+Enter in the sentence moves to the description); a description, like examples, stays shown once written. Groups can be added (empty, then filled by adding requirements or moving existing ones into them), renamed, reordered and deleted with their content.
 - The Requirements header counts requirements per key word, their examples and the inherited ones; the outline on the left shows the groups, each with the number of requirements written here and, after a `+`, the number it inherits.
+
+**Specs written in an older layout.** Specs written before key word headings, with each requirement as a list item under `## Requirements` or a group and its examples as nested `- Example: ...` items, are still read: the form shows them under key word headers, in the order they will be written. So are key word headings written with another icon or none, a conformance sentence or definitions without italics, and example titles in italics without a backslash. The first change made in the form, whatever it is, writes the whole Requirements section in the current layout: the first paragraph of a list item becomes the heading, what follows it (nested lists, other paragraphs) its description, its examples are numbered, and notes between items are kept before the first key word heading. Opening a file never changes it.
 
 ### Example scenarios
 
-A requirement can carry **example scenarios**: one concrete case each, with real values, showing what the requirement means. The beaker button of a requirement opens its examples; they are written as a nested list under it and move, are copied to another group and are deleted with it.
+A requirement can carry **example scenarios**: one concrete case each, with real values, showing what the requirement means. The beaker button of a requirement opens its examples; they are written after its description and move, are copied to another group and are deleted with it. An example can have a short **title**, typed in the box in front of its case (when adding it or later) and written in bold above it; without one it is numbered (`**Example 2**\`), and renumbered when the examples move.
 
 ```markdown
-- The service MUST record every payment attempt with its order, amount, currency and outcome.
-  - Example: three attempts on the same order, two declined and one accepted, are all readable in the back office.
+##### The service MUST record every payment attempt with its order, amount, currency and outcome.
+
+**Three attempts**\
+Three attempts on the same order, two declined and one accepted, are all readable in the back office.
+
+**Example 2**\
+A refused attempt shows the reason given by the provider.
 ```
 
-Examples are edited in place (Shift+Enter for a second line), reordered and deleted like requirements, and an empty one is removed when you leave it. They illustrate a requirement, they do not replace a [Gherkin feature](#gherkin-module): behaviour shown step by step, with its Given / When / Then, belongs in a feature file, and a requirement can link to it.
+Examples are edited in place (Shift+Enter for a second line), reordered and deleted like requirements, and one left without title or case is removed when you leave it. They illustrate a requirement, they do not replace a [Gherkin feature](#gherkin-module): behaviour shown step by step, with its Given / When / Then, belongs in a feature file, and a requirement can link to it.
 
 ### Specs that extend other specs
 
@@ -265,17 +295,18 @@ Extends: [Data storage](./data-storage.spec.md), [Audit logging](./audit-logging
 - When two specs extended **disagree** (the same requirement at two levels), the one listed first applies: the other is struck through and marked as overridden by it, and the form reports the disagreement so the child can settle it by restating the requirement.
 - A missing file, a path outside the workspace folder, a spec extending one that extends it back, and chains deeper than 10 specs are reported in the form.
 
-**Kept as written:** front matter, other `##` sections (listed with a link to their line in the text editor), notes or tables in the section or a group (they move and are deleted with their group), the list style (`-`, `*`, numbered) and task boxes (`- [x]`). Lines of the description or context that would start a `#`/`##` heading are escaped (`\##`), and a code block left open is closed, so typed text never breaks the structure.
+**Kept as written:** front matter, other `##` sections (listed with a link to their line in the text editor), notes or tables before the first key word heading of the section or a group (they move and are deleted with their group), a conformance sentence worded otherwise, the text under a key word heading when it is not its definition, a `####` heading naming no key word, and task boxes (`##### [x] ...`). Lines of the description or context that would start a `#`/`##` heading are escaped (`\##`), and so are lines of details and examples that would start a heading or, in italics at the start of a paragraph, an example; a code block left open is closed, so typed text never breaks the structure.
 
-**Checks:** missing title, several level-1 headings, several Context or Requirements sections (only the first is edited), groups with the same name, empty requirements, requirements without a key word in capitals (with a hint when it is written in lowercase, which RFC 8174 excludes), the same requirement listed twice, empty or repeated examples, an Extends line naming the same spec twice or pointing to something that is not a markdown file, and, in the form, specs extended that cannot be read, a requirement that repeats an inherited one and two specs extended that disagree.
+**Checks:** missing title, several level-1 headings, several Context or Requirements sections (only the first is edited), groups with the same name, empty requirements, requirements without a key word in capitals (with a hint when it is written in lowercase, which RFC 8174 excludes), a requirement written under the heading of another key word, the same requirement listed twice, empty or repeated examples, an Extends line naming the same spec twice or pointing to something that is not a markdown file, and, in the form, specs extended that cannot be read, a requirement that repeats an inherited one and two specs extended that disagree.
 
 **SDD Specs: Specs** lists the specs of the workspace (see [Spec catalogs](#spec-catalogs)), and **SDD Specs: New Spec (Markdown)** asks for the name of the system or component and creates `<slug>.spec.md` holding only its title.
 
 Settings:
 
 - `sdd.spec.specsFolder` (default `specs/generics`): default folder for new specs in the Specs overview.
+- `sdd.spec.keywordIcons` (default ✅ MUST, ⛔ MUST NOT, 👍 SHOULD, 👎 SHOULD NOT, 🆗 MAY, ❔ No key word): icon written in front of each key word in the `####` headings; an empty string writes the key word alone. A spec is read whatever icons it was written with (an emoji, a `:shortcode:`, an image...) and gets the icons of the settings at its next change.
 
-Samples: `samples/specs/payment-service.spec.md` (all parts, examples under two requirements, a Security group with a note, another section), `samples/specs/notifications.spec.md` (title and description only) and a hierarchy of policies: `samples/specs/data-storage.spec.md` (the general one), extended by `samples/specs/ephemeral-storage.spec.md` and by `samples/specs/persistent-storage.spec.md`, which overrides its "Data SHOULD be encrypted at rest" with a MUST and also extends `samples/specs/audit-logging.spec.md`.
+Samples: `samples/specs/payment-service.spec.md` (all parts, a description and titled examples, a Security group with a note, another section), `samples/specs/notifications.spec.md` (title and description only) and a hierarchy of policies: `samples/specs/data-storage.spec.md` (the general one), extended by `samples/specs/ephemeral-storage.spec.md` and by `samples/specs/persistent-storage.spec.md`, which overrides its "Data SHOULD be encrypted at rest" with a MUST and also extends `samples/specs/audit-logging.spec.md`.
 
 ## Threat model module (Open Threat Model)
 
@@ -489,7 +520,7 @@ Spec files can say at their top how to update them, so that an AI assistant (or 
 | Gherkin features | Comment lines: link to the Gherkin reference and how to write steps, outlines and tags (below `# language:` when there is one) |
 | Protocol Buffers | `//` comment lines: link to the language guide, style guide, field numbering and imports |
 | OpenSLO | Comment lines linking to the OpenSLO reference (it has no published JSON schema, so no modeline): kinds, how objects reference each other by name, and the fields an SLO and an SLI require |
-| Markdown specs | An HTML comment (invisible once rendered): sections, one RFC 2119 key word per requirement, groups, example scenarios, the Extends line and what not to copy from the spec extended |
+| Markdown specs | An HTML comment (invisible once rendered): sections, groups, key word headings, one `#####` heading per requirement with its description, titled example scenarios, the Extends line and what not to copy from the spec extended |
 | JSON files | JSON has no comments, so only the schema link: `"$schema"` (OpenCLI, threat models) or `"x-json-schema"` (OpenAPI and AsyncAPI, which only allow `x-` extensions) |
 
 Sample header of an OpenAPI file:
@@ -655,7 +686,7 @@ src/
       webview/                  React UI: command tree, general and command pages
     spec/
       index.ts                  module entry: form editor with the markdown engine, spec detection, commands
-      core/parse.ts             markdown → outline (title, Extends line, description, sections, requirements with their examples) with line ranges
+      core/parse.ts             markdown → outline (title, Extends line, description, sections, requirements under key word headings or in lists, with descriptions and examples) with line ranges
       core/keywords.ts          RFC 2119 key words: detection, synonyms, changing the level, composing sentences
       core/edits.ts             line edits that add or remove sections, groups and examples as they get or lose content
       core/inherit.ts           the specs extended: inherited requirements, overrides, disagreements, checks

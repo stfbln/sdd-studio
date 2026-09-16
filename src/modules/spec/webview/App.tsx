@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ReworkButton } from '../../../webview/components/ReworkButton';
 import { EditorFrame } from '../../../webview/structured/EditorFrame';
 import { useStructuredDocument, type LocalEngine } from '../../../webview/structured/useStructuredDocument';
-import { applySpecEdits, type SpecEdit } from '../core/edits';
+import { applySpecEdits, type SpecEdit, type SpecWriteOptions } from '../core/edits';
 import { inheritanceIssues, type SpecEditorContext } from '../core/inherit';
 import { parseSpecFile, type SpecFile } from '../core/parse';
 import { allRequirements, analyzeSpec, plural, type SpecAnchor } from '../core/summary';
@@ -10,9 +10,12 @@ import { Nav } from './Nav';
 import { SpecPage } from './SpecPage';
 import { anchorId, requestedAnchor, SpecContext, type SpecEditorValue } from './state';
 
+/** The icons the host writes key word headings with, once it has sent them: edits applied here write the same text. */
+const writeOptions: SpecWriteOptions = {};
+
 const engine: LocalEngine<SpecFile, SpecEdit> = {
   fromHost: (value) => value as SpecFile,
-  apply: (doc, edits) => parseSpecFile(applySpecEdits(doc.text, edits)),
+  apply: (doc, edits) => parseSpecFile(applySpecEdits(doc.text, edits, writeOptions)),
   typingKey: (edit) => {
     switch (edit.op) {
       case 'setTitle':
@@ -20,8 +23,10 @@ const engine: LocalEngine<SpecFile, SpecEdit> = {
       case 'setContext':
         return edit.op;
       case 'setRequirement':
+      case 'setRequirementDescription':
         return `${edit.op} ${edit.group} ${edit.index}`;
       case 'setExample':
+      case 'setExampleTitle':
         return `${edit.op} ${edit.group} ${edit.index} ${edit.example}`;
       default:
         return undefined;
@@ -56,6 +61,7 @@ export function App() {
   const doc = useStructuredDocument<null, SpecFile, SpecEdit>(null, engine);
   const { spec, actions } = doc;
   const hostContext = doc.hostContext as SpecEditorContext | undefined;
+  writeOptions.icons = hostContext?.keywordIcons;
   const issues = useMemo(() => (spec ? [...analyzeSpec(spec.model), ...inheritanceIssues(spec.model, hostContext?.inheritance)] : []), [spec, hostContext]);
   const visible = useVisibleAnchor(!!spec);
 

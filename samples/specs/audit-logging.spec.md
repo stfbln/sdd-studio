@@ -11,17 +11,24 @@ How to update this file (for people and AI assistants): a Markdown specification
   to find the owner, the APIs, the dependencies and the other spec files of the entity.
 - Structure: a "# Title" heading, a short description, a "## Context" section (background, free
   text) and a "## Requirements" section. Other sections are allowed and kept as written.
-- Each requirement is one list item under "## Requirements", or under a "### Group" heading inside
-  it, and uses one BCP 14 key word in capitals: MUST, MUST NOT, SHOULD, SHOULD NOT or MAY (also
-  SHALL, SHALL NOT, REQUIRED, RECOMMENDED, NOT RECOMMENDED, OPTIONAL).
+- Keep the sentence about BCP 14 key words, in italics, at the start of the Requirements section.
+  Requirements can be split into "### Group" headings inside it (e.g. Security).
+- Under the section, or under each group, requirements are listed by key word: a "#### MUST"
+  heading, then MUST NOT, SHOULD, SHOULD NOT and MAY, in this order, each followed by the definition
+  of its key word in italics and left out when it has no requirement. An icon can come before the
+  key word (e.g. "#### ✅ MUST"): use the icons already written in the file.
+- Each requirement is a "##### <sentence>" heading under the heading of its key word: one sentence
+  on one line, saying who or what it is about (e.g. "##### The service MUST ..."), with that BCP 14
+  key word in capitals (SHALL and REQUIRED are read as MUST, SHALL NOT as MUST NOT, RECOMMENDED as
+  SHOULD, NOT RECOMMENDED as SHOULD NOT, OPTIONAL as MAY). A description (details, rationale) can
+  follow under the heading, before the examples.
 - Do not write these words in lowercase inside requirements: rephrase instead (e.g. "can" or "is
-  allowed to"). Keep the sentence about BCP 14 key words at the start of the Requirements section.
-- Say who or what the requirement is about (e.g. "The service MUST ...") and keep one requirement
-  per item.
-- A requirement can be illustrated by example scenarios: a nested list under it, each item written
-  "Example: <one concrete case>" (e.g. "Example: a 20 EUR basket paid with a declined card leaves
-  the order unpaid"). Give real values, one case per item, and no expected steps: behaviour shown
-  step by step belongs in a Gherkin feature.
+  allowed to"). Keep one requirement per heading.
+- A requirement can be illustrated by example scenarios, after its description: a short title in
+  bold followed by a backslash ("**Declined card**\", or "**Example 2**\" without a title), the case
+  on the next line, and a blank line between examples. Give real values (e.g. "A 20 EUR basket paid
+  with a declined card leaves the order unpaid"), one case per example, and no expected steps:
+  behaviour shown step by step belongs in a Gherkin feature.
 - A spec can extend one or several more general specs: an "Extends: [Title](relative/path.spec.md),
   [Other](relative/other.spec.md)" line right under the title (e.g. an ephemeral storage policy
   extending a data storage policy, a persistent storage policy extending it and an audit logging
@@ -48,18 +55,36 @@ describes.
 
 ## Requirements
 
-The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as described in BCP 14 [[RFC2119](https://www.rfc-editor.org/rfc/rfc2119)] [[RFC8174](https://www.rfc-editor.org/rfc/rfc8174)] when, and only when, they appear in all capitals, as shown here.
+*The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as described in BCP 14 [[RFC2119](https://www.rfc-editor.org/rfc/rfc2119)] [[RFC8174](https://www.rfc-editor.org/rfc/rfc8174)] when, and only when, they appear in all capitals, as shown here.*
 
-- Every read and every change of personal or financial data MUST be written to
-  the audit trail with who, what, when and from where.
-  - Example: a support agent opens the address of order 4711; the trail keeps
-    the agent's account, the order, the time and the office IP range.
-- The audit trail MUST NOT hold the data that was read, only what was touched.
-- A component MUST NOT be able to change or delete an entry of the audit trail:
-  the store is append-only.
-- Entries MUST be kept for one year at least.
-- Reading the audit trail SHOULD be limited to the security team and to the
-  data protection officer.
-  - Example: a developer asking who read an address opens a request to the
-    security team instead of querying the trail.
-- A gap in the trail MUST raise an alert to the security team within an hour.
+#### ✅ MUST
+
+*An absolute requirement of the specification (also written REQUIRED or SHALL).*
+
+##### Every read and every change of personal or financial data MUST be written to the audit trail with who, what, when and from where.
+
+**Example 1**\
+A support agent opens the address of order 4711; the trail keeps
+the agent's account, the order, the time and the office IP range.
+
+##### Entries MUST be kept for one year at least.
+
+##### A gap in the trail MUST raise an alert to the security team within an hour.
+
+#### ⛔ MUST NOT
+
+*An absolute prohibition of the specification (also written SHALL NOT).*
+
+##### The audit trail MUST NOT hold the data that was read, only what was touched.
+
+##### A component MUST NOT be able to change or delete an entry of the audit trail: the store is append-only.
+
+#### 👍 SHOULD
+
+*Recommended: there may exist valid reasons in particular circumstances to ignore the requirement, but the full implications must be understood and carefully weighed before choosing a different course (also written RECOMMENDED).*
+
+##### Reading the audit trail SHOULD be limited to the security team and to the data protection officer.
+
+**Example 1**\
+A developer asking who read an address opens a request to the
+security team instead of querying the trail.

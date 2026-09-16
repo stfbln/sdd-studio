@@ -11,17 +11,24 @@ How to update this file (for people and AI assistants): a Markdown specification
   to find the owner, the APIs, the dependencies and the other spec files of the entity.
 - Structure: a "# Title" heading, a short description, a "## Context" section (background, free
   text) and a "## Requirements" section. Other sections are allowed and kept as written.
-- Each requirement is one list item under "## Requirements", or under a "### Group" heading inside
-  it, and uses one BCP 14 key word in capitals: MUST, MUST NOT, SHOULD, SHOULD NOT or MAY (also
-  SHALL, SHALL NOT, REQUIRED, RECOMMENDED, NOT RECOMMENDED, OPTIONAL).
+- Keep the sentence about BCP 14 key words, in italics, at the start of the Requirements section.
+  Requirements can be split into "### Group" headings inside it (e.g. Security).
+- Under the section, or under each group, requirements are listed by key word: a "#### MUST"
+  heading, then MUST NOT, SHOULD, SHOULD NOT and MAY, in this order, each followed by the definition
+  of its key word in italics and left out when it has no requirement. An icon can come before the
+  key word (e.g. "#### ✅ MUST"): use the icons already written in the file.
+- Each requirement is a "##### <sentence>" heading under the heading of its key word: one sentence
+  on one line, saying who or what it is about (e.g. "##### The service MUST ..."), with that BCP 14
+  key word in capitals (SHALL and REQUIRED are read as MUST, SHALL NOT as MUST NOT, RECOMMENDED as
+  SHOULD, NOT RECOMMENDED as SHOULD NOT, OPTIONAL as MAY). A description (details, rationale) can
+  follow under the heading, before the examples.
 - Do not write these words in lowercase inside requirements: rephrase instead (e.g. "can" or "is
-  allowed to"). Keep the sentence about BCP 14 key words at the start of the Requirements section.
-- Say who or what the requirement is about (e.g. "The service MUST ...") and keep one requirement
-  per item.
-- A requirement can be illustrated by example scenarios: a nested list under it, each item written
-  "Example: <one concrete case>" (e.g. "Example: a 20 EUR basket paid with a declined card leaves
-  the order unpaid"). Give real values, one case per item, and no expected steps: behaviour shown
-  step by step belongs in a Gherkin feature.
+  allowed to"). Keep one requirement per heading.
+- A requirement can be illustrated by example scenarios, after its description: a short title in
+  bold followed by a backslash ("**Declined card**\", or "**Example 2**\" without a title), the case
+  on the next line, and a blank line between examples. Give real values (e.g. "A 20 EUR basket paid
+  with a declined card leaves the order unpaid"), one case per example, and no expected steps:
+  behaviour shown step by step belongs in a Gherkin feature.
 - A spec can extend one or several more general specs: an "Extends: [Title](relative/path.spec.md),
   [Other](relative/other.spec.md)" line right under the title (e.g. an ephemeral storage policy
   extending a data storage policy, a persistent storage policy extending it and an audit logging
@@ -48,19 +55,38 @@ from a persistent store.
 
 ## Requirements
 
-The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as described in BCP 14 [[RFC2119](https://www.rfc-editor.org/rfc/rfc2119)] [[RFC8174](https://www.rfc-editor.org/rfc/rfc8174)] when, and only when, they appear in all capitals, as shown here.
+*The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as described in BCP 14 [[RFC2119](https://www.rfc-editor.org/rfc/rfc2119)] [[RFC8174](https://www.rfc-editor.org/rfc/rfc8174)] when, and only when, they appear in all capitals, as shown here.*
 
-- Every item MUST be written with a time to live of seven days at most.
-  - Example: a basket is cached for two hours; once the customer comes back a
-    day later, the checkout reads the basket from the orders database again.
-- A component MUST keep working, slower, when the store answers that it holds
-  nothing.
-  - Example: the checkout cache is emptied during a failover; the next requests
-    are served from the orders database and only latency changes.
-- An ephemeral store MUST NOT be the only place holding data an invoice, a
-  shipment or an audit depends on.
-- An ephemeral store MUST NOT be backed up.
-- Personal data SHOULD NOT be written to an ephemeral store; when it is, the
-  time to live MUST be one day at most.
-  - Example: a delivery address kept in the checkout cache is dropped after
-    four hours.
+#### ✅ MUST
+
+*An absolute requirement of the specification (also written REQUIRED or SHALL).*
+
+##### Every item MUST be written with a time to live of seven days at most.
+
+**Example 1**\
+A basket is cached for two hours; once the customer comes back a
+day later, the checkout reads the basket from the orders database again.
+
+##### A component MUST keep working, slower, when the store answers that it holds nothing.
+
+**Example 1**\
+The checkout cache is emptied during a failover; the next requests
+are served from the orders database and only latency changes.
+
+#### ⛔ MUST NOT
+
+*An absolute prohibition of the specification (also written SHALL NOT).*
+
+##### An ephemeral store MUST NOT be the only place holding data an invoice, a shipment or an audit depends on.
+
+##### An ephemeral store MUST NOT be backed up.
+
+#### 👎 SHOULD NOT
+
+*Not recommended: there may exist valid reasons in particular circumstances when the behavior is acceptable or even useful, but the full implications should be understood and the case carefully weighed before implementing it (also written NOT RECOMMENDED).*
+
+##### Personal data SHOULD NOT be written to an ephemeral store; when it is, the time to live MUST be one day at most.
+
+**Example 1**\
+A delivery address kept in the checkout cache is dropped after
+four hours.

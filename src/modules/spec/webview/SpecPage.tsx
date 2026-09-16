@@ -1,16 +1,38 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { dirOf, relativePath } from '../../../shared/files';
 import { AutoTextarea } from '../../../webview/components/AutoTextarea';
 import { IconButton } from '../../../webview/components/IconButton';
 import { requestFocus } from '../../../webview/focus';
 import { ProblemsList } from '../../../webview/structured/EditorFrame';
 import { Field, KeyInput, Section } from '../../../webview/structured/fields';
-import { listOf, normalizeBlock, normalizeExample, normalizeRequirement, normalizeTitle, type ListRef } from '../core/edits';
+import {
+  listOf,
+  normalizeBlock,
+  normalizeExample,
+  normalizeExampleTitle,
+  normalizeRequirement,
+  normalizeRequirementDescription,
+  normalizeTitle,
+  sortByLevel,
+  type ListRef,
+} from '../core/edits';
 import { groupKey, mergeInherited, parentPath, specName, type InheritedEntry } from '../core/inherit';
-import { composeRequirement, CONFORMANCE_NOTICE, findKeyword, KEYWORD_MEANINGS, KEYWORDS, withKeyword, type Keyword } from '../core/keywords';
-import type { Example, Heading, Requirement } from '../core/parse';
+import {
+  composeRequirement,
+  CONFORMANCE_NOTICE,
+  DEFAULT_KEYWORD_ICONS,
+  findKeyword,
+  KEYWORD_MEANINGS,
+  KEYWORDS,
+  levelDefinition,
+  levelIntro,
+  NO_KEYWORD_HEADING,
+  withKeyword,
+  type Keyword,
+} from '../core/keywords';
+import type { Example, Heading, Requirement, RequirementLevel, RequirementList as List } from '../core/parse';
 import { allRequirements, defaultSubject, exampleCount, keywordCounts, plural } from '../core/summary';
-import { anchorId, exampleKey, goTo, groupId, inheritedGroupId, listKey, useDraft, useSpec } from './state';
+import { anchorId, descriptionKey, exampleKey, goTo, groupId, inheritedGroupId, listKey, useDraft, useSpec } from './state';
 
 export const keywordClass = (keyword: string | undefined) => (keyword ? `kw kw-${keyword.toLowerCase().replace(' ', '-')}` : 'kw kw-none');
 
@@ -143,7 +165,7 @@ function OverviewSection() {
   );
 }
 
-/** One inherited requirement, shown read-only above the requirements of this spec in its group. */
+/** One inherited requirement, shown read-only above the requirements of this spec with its key word. */
 function InheritedRow({ entry }: { entry: InheritedEntry }) {
   const { openFile } = useSpec();
   const { spec, requirement, overridden, through } = entry;
@@ -172,12 +194,13 @@ function InheritedRow({ entry }: { entry: InheritedEntry }) {
             </span>
           )}
         </span>
+        {requirement.description && <span className="sentence inherited-description">{requirement.description}</span>}
         {requirement.examples.length > 0 && (
           <ul className="example-list">
             {requirement.examples.map((example, position) => (
               <li key={position} className="example-row read-only">
-                <span className="example-label">Example</span>
-                <span className="sentence">{example}</span>
+                <span className="example-label">{example.title || `Example ${position + 1}`}</span>
+                <span className="sentence">{example.text}</span>
               </li>
             ))}
           </ul>
@@ -220,7 +243,7 @@ function ContextSection() {
 }
 
 /** Key word picker; the key word itself lives in the sentence. */
-function KeywordSelect({ written, onChange, label, disabled }: { written?: string; onChange(keyword: string): void; label: string; disabled?: boolean }) {
+function KeywordSelect({ written, onChange, label, disabled, focusKey }: { written?: string; onChange(keyword: string): void; label: string; disabled?: boolean; focusKey?: string }) {
   const keyword = written ? (findKeyword(written)?.keyword ?? written) : undefined;
   return (
     <select
@@ -229,6 +252,7 @@ function KeywordSelect({ written, onChange, label, disabled }: { written?: strin
       title={keyword ? KEYWORD_MEANINGS[keyword as Keyword] : 'No RFC 2119 key word in capitals'}
       value={written ?? ''}
       disabled={disabled}
+      data-focus-key={focusKey}
       onChange={(e) => onChange(e.target.value)}
     >
       {!written && <option value="">—</option>}
@@ -242,17 +266,35 @@ function KeywordSelect({ written, onChange, label, disabled }: { written?: strin
   );
 }
 
-/** One example scenario of a requirement: an empty one is removed when it is left. */
+/** One example scenario of a requirement: a title ("Example 2" when empty) and the case; an empty one is removed when it is left. */
 function ExampleRow({ group, index, example, position, count }: { group: ListRef; index: number; example: Example; position: number; count: number }) {
   const { edit } = useSpec();
   const [draft, setDraft] = useDraft(example.text, normalizeExample);
+  const [title, setTitle] = useDraft(example.title, normalizeExampleTitle);
   const row = useRef<HTMLLIElement>(null);
   const remove = () => edit({ op: 'deleteExample', group, index, example: position });
+  const leave = (next: EventTarget | null) => {
+    if (!normalizeExample(draft) && !normalizeExampleTitle(title) && !row.current?.contains(next as Node | null)) remove();
+  };
   return (
     <li className="example-row" ref={row}>
-      <span className="example-label" aria-hidden="true">
-        Example
-      </span>
+      <input
+        className="input example-title"
+        value={title}
+        aria-label={`Title of example ${position + 1} of requirement ${index + 1}`}
+        data-focus-key={exampleKey(group, index, position, 'title')}
+        placeholder={`Example ${position + 1}`}
+        title={`Title of the example, written in bold above it; “Example ${position + 1}” when none is given`}
+        onChange={(e) => {
+          setTitle(e.target.value);
+          edit({ op: 'setExampleTitle', group, index, example: position, title: e.target.value });
+        }}
+        onKeyDown={(e) => {
+          // The case is in the same row: focused at once, so the next keystrokes go there.
+          if (e.key === 'Enter') row.current?.querySelector('textarea')?.focus();
+        }}
+        onBlur={(e) => leave(e.relatedTarget)}
+      />
       <AutoTextarea
         value={draft}
         aria-label={`Example ${position + 1} of requirement ${index + 1}`}
@@ -265,16 +307,14 @@ function ExampleRow({ group, index, example, position, count }: { group: ListRef
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey && !e.altKey) {
             e.preventDefault();
-            requestFocus(exampleKey(group, index));
-          } else if (e.key === 'Backspace' && !draft) {
+            requestFocus(exampleKey(group, index, undefined, 'title'));
+          } else if (e.key === 'Backspace' && !draft && !title) {
             e.preventDefault();
             remove();
-            requestFocus(position > 0 ? exampleKey(group, index, position - 1) : exampleKey(group, index));
+            requestFocus(position > 0 ? exampleKey(group, index, position - 1) : exampleKey(group, index, undefined, 'title'));
           }
         }}
-        onBlur={(e) => {
-          if (!normalizeExample(draft) && !row.current?.contains(e.relatedTarget as Node | null)) remove();
-        }}
+        onBlur={(e) => leave(e.relatedTarget)}
       />
       <span className="row-actions">
         <IconButton icon="arrow-up" label="Move example up" disabled={position === 0} onClick={() => edit({ op: 'moveExample', group, index, example: position, to: position - 1 })} />
@@ -285,57 +325,113 @@ function ExampleRow({ group, index, example, position, count }: { group: ListRef
   );
 }
 
-/** Example scenarios of one requirement, written as a nested "- Example: ..." list under it. */
+/**
+ * Example scenarios of one requirement, written after its description: "**Title**\" with the case on
+ * the next line, "**Example 2**\" when no title is given. Without examples, the add box only shows
+ * while the requirement is being edited.
+ */
 function ExampleList({ group, index, examples }: { group: ListRef; index: number; examples: Example[] }) {
   const { edit } = useSpec();
+  const [title, setTitle] = useState('');
   const [typed, setTyped] = useState('');
+  const titleInput = useRef<HTMLInputElement>(null);
+  const caseInput = useRef<HTMLInputElement>(null);
+  const numbered = `Example ${examples.length + 1}`;
+  const ready = !!(normalizeExample(typed) || normalizeExampleTitle(title));
   const add = () => {
-    const text = normalizeExample(typed);
-    if (!text) return;
-    edit({ op: 'addExample', group, index, text });
+    if (!ready) return;
+    edit({ op: 'addExample', group, index, text: typed, title });
+    setTitle('');
     setTyped('');
+    titleInput.current?.focus();
+  };
+  const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') {
+      setTitle('');
+      setTyped('');
+    }
   };
   return (
-    <div className="requirement-examples">
+    <div className={`requirement-examples ${examples.length || typed || title ? '' : 'empty'}`}>
       <ul className="example-list">
         {examples.map((example, position) => (
           <ExampleRow key={position} group={group} index={index} example={example} position={position} count={examples.length} />
         ))}
         <li className="example-row example-add">
-          <span className="example-label" aria-hidden="true">
-            Example
-          </span>
           <input
+            ref={titleInput}
+            className="input example-title"
+            data-focus-key={exampleKey(group, index, undefined, 'title')}
+            aria-label={`Title of the new example of requirement ${index + 1}`}
+            placeholder={numbered}
+            title={`Title of the new example, written in bold above it; “${numbered}” when none is given`}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onKeyDown={(e) => {
+              onKeyDown(e);
+              if (e.key === 'Enter') caseInput.current?.focus();
+            }}
+          />
+          <input
+            ref={caseInput}
             className="input"
             data-focus-key={exampleKey(group, index)}
             aria-label={`New example of requirement ${index + 1}`}
-            placeholder="One concrete case, with real values, e.g. “a 20 EUR basket paid with a declined card leaves the order unpaid”"
+            placeholder="One concrete case, with real values, e.g. “A 20 EUR basket paid with a declined card leaves the order unpaid”"
             value={typed}
             onChange={(e) => setTyped(e.target.value)}
             onKeyDown={(e) => {
+              onKeyDown(e);
               if (e.key === 'Enter') add();
-              if (e.key === 'Escape') setTyped('');
             }}
           />
-          <IconButton icon="add" label="Add example" disabled={!normalizeExample(typed)} onClick={add} />
+          <IconButton icon="add" label="Add example" disabled={!ready} onClick={add} />
         </li>
       </ul>
     </div>
   );
 }
 
-function RequirementRow({ group, item, index, count }: { group: ListRef; item: Requirement; index: number; count: number }) {
+/** Description of a requirement (details, rationale), written between its heading and its examples; an empty one only shows while the requirement is being edited. */
+function DescriptionField({ group, index, description }: { group: ListRef; index: number; description: string }) {
+  const { edit } = useSpec();
+  const [draft, setDraft] = useDraft(description, normalizeRequirementDescription);
+  return (
+    <div className={`requirement-description ${draft ? '' : 'empty'}`}>
+      <AutoTextarea
+        value={draft}
+        aria-label={`Description of requirement ${index + 1}`}
+        data-focus-key={descriptionKey(group, index)}
+        placeholder="Add a description: details or rationale, written between the requirement and its examples. Markdown is allowed."
+        onChange={(text) => {
+          setDraft(text);
+          edit({ op: 'setRequirementDescription', group, index, text });
+        }}
+      />
+    </div>
+  );
+}
+
+function RequirementRow({ group, item, index, level }: { group: ListRef; item: Requirement; index: number; level: RequirementLevel }) {
   const { model, edit } = useSpec();
   const [draft, setDraft] = useDraft(item.text, normalizeRequirement);
-  const [showExamples, setShowExamples] = useState(false);
   const row = useRef<HTMLLIElement>(null);
   const key = listKey(group);
   const groups = model.requirements?.groups ?? [];
   const remove = () => edit({ op: 'deleteRequirement', group, index });
   const move = (toGroup: ListRef, toIndex?: number) => edit({ op: 'moveRequirement', group, index, toGroup, toIndex });
-  const setText = (text: string) => {
+  /** The sentence is a heading, on one line. Taking another key word moves it under that key word: the focus follows it. */
+  const setText = (value: string, focusSuffix = '') => {
+    const text = value.replace(/[ \t]*\r?\n[ \t]*/g, ' ');
     setDraft(text);
     edit({ op: 'setRequirement', group, index, text });
+    const keyword = findKeyword(text)?.keyword;
+    if (!keyword || keyword === item.level) return;
+    const items = (listOf(model, group)?.items ?? []).map((other, position) => ({ level: position === index ? keyword : other.level, position }));
+    const typing = document.activeElement;
+    requestFocus(`${key}-${sortByLevel(items).findIndex((other) => other.position === index)}${focusSuffix}`, {
+      caret: typing instanceof HTMLTextAreaElement ? typing.selectionStart : undefined,
+    });
   };
 
   return (
@@ -343,17 +439,23 @@ function RequirementRow({ group, item, index, count }: { group: ListRef; item: R
       <span className="requirement-number" aria-hidden="true">
         {item.checkbox ? <span className={`codicon codicon-${/x/i.test(item.checkbox) ? 'pass-filled' : 'circle-large-outline'}`} title={`Task list item ${item.checkbox.trim()}, kept as written`} /> : `${index + 1}.`}
       </span>
-      <KeywordSelect written={findKeyword(draft)?.written} label={`Key word of requirement ${index + 1}`} onChange={(k) => setText(withKeyword(draft, k))} />
+      <KeywordSelect
+        written={findKeyword(draft)?.written}
+        label={`Key word of requirement ${index + 1}`}
+        focusKey={`${key}-${index}-kw`}
+        onChange={(k) => setText(withKeyword(draft, k), '-kw')}
+      />
       <AutoTextarea
         value={draft}
         aria-label={`Requirement ${index + 1}`}
         data-focus-key={`${key}-${index}`}
         placeholder="Empty requirement: removed when you leave it"
-        onChange={setText}
+        onChange={(text) => setText(text)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey && !e.altKey) {
+          if (e.key === 'Enter') {
             e.preventDefault();
-            requestFocus(`${key}-add`);
+            if (e.shiftKey || e.altKey) requestFocus(descriptionKey(group, index));
+            else requestFocus(`${key}-add`);
           } else if (e.key === 'Backspace' && !draft) {
             e.preventDefault();
             remove();
@@ -381,19 +483,14 @@ function RequirementRow({ group, item, index, count }: { group: ListRef; item: R
             ))}
           </select>
         )}
-        <IconButton
-          icon="beaker"
-          label={item.examples.length ? `Examples (${item.examples.length})` : 'Add an example scenario'}
-          onClick={() => {
-            setShowExamples(true);
-            requestFocus(exampleKey(group, index));
-          }}
-        />
-        <IconButton icon="arrow-up" label="Move up" disabled={index === 0} onClick={() => move(group, index - 1)} />
-        <IconButton icon="arrow-down" label="Move down" disabled={index === count - 1} onClick={() => move(group, index + 1)} />
+        <IconButton icon="note" label={item.description ? 'Description' : 'Add a description'} onClick={() => requestFocus(descriptionKey(group, index))} />
+        <IconButton icon="beaker" label={item.examples.length ? `Examples (${item.examples.length})` : 'Add an example scenario'} onClick={() => requestFocus(exampleKey(group, index, undefined, 'title'))} />
+        <IconButton icon="arrow-up" label="Move up" disabled={index === level.start} onClick={() => move(group, index - 1)} />
+        <IconButton icon="arrow-down" label="Move down" disabled={index === level.start + level.count - 1} onClick={() => move(group, index + 1)} />
         <IconButton icon="trash" label="Delete requirement" onClick={remove} />
       </span>
-      {(showExamples || item.examples.length > 0) && <ExampleList group={group} index={index} examples={item.examples} />}
+      <DescriptionField group={group} index={index} description={item.description} />
+      <ExampleList group={group} index={index} examples={item.examples} />
     </li>
   );
 }
@@ -437,31 +534,70 @@ function AddRequirement({ focusKey, onAdd }: { focusKey: string; onAdd(text: str
   );
 }
 
-/** The inherited requirements of a list, then the ones written in this spec, then the add box. */
+/** Levels in the order they are written: the key words, then the requirements without one. */
+const LEVELS: (Keyword | undefined)[] = [...KEYWORDS, undefined];
+
+/**
+ * The requirements of a list under a header per key word, as the file writes them: the inherited ones
+ * with that key word first, then the ones of this spec. `list` is undefined for a group only the
+ * specs extended have.
+ */
+function Levels({ group, list, inherited }: { group: ListRef; list?: List; inherited: InheritedEntry[] }) {
+  const icons = useSpec().context?.keywordIcons ?? DEFAULT_KEYWORD_ICONS;
+  const levels = LEVELS.flatMap((keyword) => {
+    const own = list?.levels.find((level) => level.keyword === keyword);
+    const entries = inherited.filter((entry) => entry.requirement.keyword === keyword);
+    return own || entries.length ? [{ keyword, own, entries }] : [];
+  });
+  return (
+    <>
+      {levels.map(({ keyword, own, entries }) => (
+        <div key={keyword ?? ''} className="requirement-level">
+          <div className="requirement-level-header">
+            <span className={`kind-badge ${keywordClass(keyword)}`} title={levelDefinition(keyword)}>
+              {[icons[keyword ?? NO_KEYWORD_HEADING], keyword ?? NO_KEYWORD_HEADING].filter(Boolean).join(' ')}
+            </span>
+            <span className="muted small">{keyword ? KEYWORD_MEANINGS[keyword] : 'Level not stated: pick a key word for each of them'}</span>
+            <span className="count">{(own?.count ?? 0) + entries.length}</span>
+            {own?.heading && (own.customHeading || own.intro !== levelIntro(keyword)) && (
+              <span className="muted small">
+                <span className="codicon codicon-note" aria-hidden="true" /> {own.customHeading ? `“${own.heading.text}”` : own.intro ? 'notes' : 'no definition'} kept as written:{' '}
+                <TextLink heading={own.heading} label="show in text" />
+              </span>
+            )}
+          </div>
+          <InheritedRows entries={entries} />
+          {list && own && own.count > 0 && (
+            <ol className="requirement-list">
+              {list.items.slice(own.start, own.start + own.count).map((item, i) => (
+                <RequirementRow key={own.start + i} group={group} item={item} index={own.start + i} level={own} />
+              ))}
+            </ol>
+          )}
+        </div>
+      ))}
+    </>
+  );
+}
+
+/** The requirements of a list, level by level, then the add box. */
 function RequirementList({ group, inherited }: { group: ListRef; inherited: InheritedEntry[] }) {
   const { model, edit } = useSpec();
   const list = listOf(model, group);
   const items = list?.items ?? [];
   return (
     <>
-      {list?.otherContent && group !== null && (
+      {list?.notes && group !== null && (
         <p className="muted small">
           <span className="codicon codicon-note" aria-hidden="true" /> This group also has notes kept as written:{' '}
           <TextLink heading={model.requirements!.groups[group].heading} label="show in text" />.
         </p>
       )}
-      <InheritedRows entries={inherited} />
+      <Levels group={group} list={list} inherited={inherited} />
       {!items.length && group !== null && (
         <p className="muted small empty-group">
           {inherited.length ? 'Nothing of its own yet: ' : 'No requirements yet: '}add one below, or move one here with the group picker of a requirement.
         </p>
-      )}
-      {items.length > 0 && (
-        <ol className="requirement-list">
-          {items.map((item, index) => (
-            <RequirementRow key={index} group={group} item={item} index={index} count={items.length} />
-          ))}
-        </ol>
       )}
       <AddRequirement focusKey={listKey(group)} onAdd={(text) => edit({ op: 'addRequirement', group, text })} />
     </>
@@ -479,7 +615,7 @@ function InheritedGroupBlock({ name, entries, index }: { name: string; entries: 
         <span className="op-label muted">inherited</span>
         <span className="count">{entries.length}</span>
       </header>
-      <InheritedRows entries={entries} />
+      <Levels group={null} inherited={entries} />
       <AddRequirement focusKey={`i${index}`} onAdd={(text) => edit({ op: 'addGroup', name, text })} />
     </div>
   );
@@ -488,13 +624,13 @@ function InheritedGroupBlock({ name, entries, index }: { name: string; entries: 
 function GroupBlock({ group, inherited }: { group: number; inherited: InheritedEntry[] }) {
   const { model, edit } = useSpec();
   const groups = model.requirements!.groups;
-  const { heading, items, otherContent } = groups[group];
+  const { heading, items, notes } = groups[group];
   const move = (toIndex: number, button: string) => {
     edit({ op: 'moveGroup', group, toIndex });
     // The blocks are keyed by position: follow the group to its new place.
     requestFocus(`g${toIndex}-${button}`);
   };
-  const content = [items.length ? plural(items.length, 'requirement') : '', otherContent ? 'its notes' : ''].filter(Boolean).join(' and ');
+  const content = [items.length ? plural(items.length, 'requirement') : '', notes ? 'its notes' : ''].filter(Boolean).join(' and ');
   return (
     <div id={groupId(group)} className="requirement-group">
       <header className="requirement-group-header">
@@ -590,8 +726,9 @@ function RequirementsSection() {
             RFC 2119
           </a>{' '}
           key word in capitals: <b>MUST</b> / <b>MUST NOT</b> for absolute requirements, <b>SHOULD</b> / <b>SHOULD NOT</b> for recommendations with justified
-          exceptions, <b>MAY</b> for options. Enter in a requirement moves to the add box, Shift+Enter starts a new line. The <span className="codicon codicon-beaker" aria-hidden="true" />{' '}
-          button lists example scenarios under a requirement: one concrete case each, with real values.
+          exceptions, <b>MAY</b> for options. Each one is written as a heading under the heading of its key word: picking another key word moves it there. While
+          you edit a requirement, a description (details, rationale) and example scenarios can be added under it: one concrete case each, with real values, and a
+          title when it helps. Enter in a requirement moves to the add box, Shift+Enter to its description.
         </p>
         {inherited.total > 0 && (
           <p className="muted small">
@@ -613,7 +750,7 @@ function RequirementsSection() {
           />{' '}
           Start with the BCP 14 conformance sentence (“The key words "MUST", "MUST NOT"… are to be interpreted as described in RFC 2119…”)
         </label>
-        {requirements?.list.otherContent && (
+        {requirements?.list.notes && (
           <p className="notice small">
             <span className="codicon codicon-info" aria-hidden="true" />
             The section also has text kept as written: <TextLink heading={requirements.section.heading} label="show in text" />

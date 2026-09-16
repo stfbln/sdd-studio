@@ -76,6 +76,31 @@ select.kw {
   border-radius: var(--sdd-radius);
 }
 
+/* Requirements of one key word, under a header, as the file writes them under a "####" heading. */
+.requirement-level {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.requirement-level + .requirement-level {
+  margin-top: 6px;
+}
+
+.requirement-level-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-left: calc(2.4ch + 6px);
+}
+
+.requirement-level-header > .kind-badge {
+  min-width: 7em;
+  padding: 1px 6px;
+  font-size: 0.8em;
+}
+
 .requirement-list {
   display: flex;
   flex-direction: column;
@@ -221,6 +246,10 @@ select.kw {
   white-space: pre-wrap;
 }
 
+.inherited-description {
+  font-size: 0.95em;
+}
+
 .inherited-text .overridden {
   text-decoration: line-through;
 }
@@ -244,9 +273,22 @@ select.kw {
 
 /* Example scenarios of a requirement ---------------------------------------- */
 
+.requirement-description,
 .requirement-examples {
   grid-column: 3 / -1;
   min-width: 0;
+}
+
+/* Without content, the description and the examples of a requirement show while it is being edited. */
+.requirement-row:not(:focus-within) > .requirement-description.empty,
+.requirement-row:not(:focus-within) > .requirement-examples.empty {
+  display: none;
+}
+
+.requirement-description.empty .textarea:not(:focus) {
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--sdd-border);
 }
 
 .example-list {
@@ -261,7 +303,7 @@ select.kw {
 
 .example-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(12ch, 22ch) minmax(0, 1fr) auto;
   align-items: start;
   gap: 6px;
   font-size: 0.95em;
@@ -272,14 +314,27 @@ select.kw {
   color: var(--sdd-muted);
 }
 
+/* Example titles are written in bold in the file. */
+.example-label,
+.example-row .example-title {
+  font-weight: 600;
+}
+
 .example-label {
   padding-top: 4px;
   color: var(--sdd-muted);
-  font-size: 0.9em;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
+.example-row.read-only .example-label {
+  padding-top: 0;
+}
+
+.example-row .example-title {
+  min-width: 0;
+}
+
+/* An empty title shows the numbered title written instead, in a box that reads as one to fill. */
+.example-row .example-title:not(:focus):placeholder-shown,
 .example-add .input:not(:focus):placeholder-shown {
   background: transparent;
   border-style: dashed;
@@ -309,8 +364,13 @@ select.kw {
     flex-wrap: wrap;
   }
 
+  .requirement-description,
   .requirement-examples {
     grid-column: 2;
+  }
+
+  .requirement-level-header {
+    margin-left: 0;
   }
 
   .inherited-row > .kind-badge,

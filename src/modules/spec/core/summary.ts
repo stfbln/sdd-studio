@@ -48,13 +48,13 @@ export function defaultSubject(model: SpecModel): string {
 
 /**
  * `*.spec.md` files, and other markdown files whose `## Requirements` section uses RFC 2119 key
- * words (README files and notes are not listed).
+ * words, in `#####` headings or list items (README files and notes are not listed).
  */
 export function looksLikeSpec(fileName: string, text: string): boolean {
   const name = fileName.toLowerCase();
   if (name.endsWith(SPEC_EXTENSION)) return true;
   if (!/\.(md|markdown)$/.test(name)) return false;
-  return /^##[ \t]+requirements[ \t#]*$/im.test(text) && /^[ \t]*([-*+]|\d+[.)])[ \t].*(?<![\w-])(MUST|SHALL|SHOULD|MAY|REQUIRED)(?![\w-])/m.test(text);
+  return /^##[ \t]+requirements[ \t#]*$/im.test(text) && /^[ \t]*([-*+]|\d+[.)]|#####)[ \t].*(?<![\w-])(MUST|SHALL|SHOULD|MAY|REQUIRED)(?![\w-])/m.test(text);
 }
 
 export function analyzeSpec(model: SpecModel): SpecIssue[] {
@@ -94,16 +94,18 @@ export function analyzeSpec(model: SpecModel): SpecIssue[] {
     if (!item.keyword) {
       const lower = lowercaseKeyword(item.text);
       warn(location, lower ? `${Label} writes "${lower}" in lowercase: key words only carry their RFC 2119 meaning in capitals` : `${Label} has no RFC 2119 key word (MUST, MUST NOT, SHOULD, SHOULD NOT, MAY)`);
+    } else if (item.level && item.keyword !== item.level) {
+      warn(location, `${Label} says ${item.keyword} but is written under the ${item.level} heading: editing its sentence moves it under ${item.keyword}`);
     }
     if (seen.has(key)) warn(location, `${Label} is listed twice`);
     seen.add(key);
 
     const examples = new Set<string>();
-    for (const [example, { text }] of item.examples.entries()) {
+    for (const [example, { title, text }] of item.examples.entries()) {
       const value = normalizeTitle(text).toLowerCase();
-      if (!value) warn({ ...location, example }, `${Label}: example ${example + 1} is empty`);
-      else if (examples.has(value)) warn({ ...location, example }, `${Label}: example ${example + 1} is listed twice`);
-      examples.add(value);
+      if (!value && !title) warn({ ...location, example }, `${Label}: example ${example + 1} is empty`);
+      else if (value && examples.has(value)) warn({ ...location, example }, `${Label}: example ${example + 1} is listed twice`);
+      if (value) examples.add(value);
     }
   }
   return issues;

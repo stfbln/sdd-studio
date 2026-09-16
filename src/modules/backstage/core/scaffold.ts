@@ -9,7 +9,7 @@ import { newOpenCliDocument } from '../../opencli/core/opencli';
 import { API_VERSION as OPENSLO_API_VERSION } from '../../openslo/core/model';
 import { OTM_VERSION } from '../../otm/core/otm';
 import { toPascalCase, toSnakeCase } from '../../proto/core/analysis';
-import { CONFORMANCE_NOTICE } from '../../spec/core/keywords';
+import { WRITTEN_NOTICE } from '../../spec/core/keywords';
 import type { BriefRef, EntityBrief, NewSpecFileRequest } from './brief';
 import { CATEGORIES, dirOf, relativePath } from './model';
 
@@ -53,7 +53,7 @@ function markdownSpec(request: NewSpecFileRequest, path: string): string {
     '',
     '## Requirements',
     '',
-    CONFORMANCE_NOTICE,
+    WRITTEN_NOTICE,
     '',
   ].join('\n');
 }

@@ -7,7 +7,7 @@
  */
 import { dirOf, resolvePath } from '../../../shared/files';
 import { normalizeTitle } from './edits';
-import { findKeyword, type Keyword } from './keywords';
+import { findKeyword, type Keyword, type KeywordIcons } from './keywords';
 import type { SpecModel } from './parse';
 import { allRequirements, type SpecIssue } from './summary';
 
@@ -20,7 +20,8 @@ export interface InheritedRequirement {
   group: string | null;
   text: string;
   keyword?: Keyword;
-  examples: string[];
+  description: string;
+  examples: { title: string; text: string }[];
 }
 
 /** One spec the edited one inherits from, directly or through another. */
@@ -49,6 +50,8 @@ export interface SpecEditorContext {
   /** The other specs of the workspace folder, to pick the specs this one extends. */
   specs: { path: string; title: string }[];
   inheritance: SpecInheritance;
+  /** Icons of the key word headings, from the settings. */
+  keywordIcons: KeywordIcons;
 }
 
 /** Workspace path of a spec `file` extends, from the path written in it. */
@@ -66,7 +69,8 @@ export function requirementsOf(model: SpecModel): InheritedRequirement[] {
       group: group === null ? null : (groups[group]?.heading.text ?? null),
       text: item.text,
       keyword: item.keyword,
-      examples: item.examples.map((e) => e.text),
+      description: item.description,
+      examples: item.examples.map(({ title, text }) => ({ title, text })),
     }));
 }
 

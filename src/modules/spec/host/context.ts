@@ -10,7 +10,13 @@ import {
   type SpecEditorContext,
   type SpecInheritance,
 } from '../core/inherit';
+import { keywordIcons, type KeywordIcons } from '../core/keywords';
 import { parseSpecMarkdown, type SpecParent } from '../core/parse';
+
+export const KEYWORD_ICONS_SETTING = 'sdd.spec.keywordIcons';
+
+/** The icons written in front of the key words, from the settings. */
+export const keywordIconsSetting = (): KeywordIcons => keywordIcons(vscode.workspace.getConfiguration('sdd.spec').get('keywordIcons'));
 
 /** The open document, so unsaved changes to a spec extended are shown too. */
 async function readSpec(workspace: number, path: string): Promise<string | undefined> {
@@ -86,5 +92,10 @@ export async function computeSpecContext(document: vscode.TextDocument, index: S
     .filter((entry) => entry.summary.workspace === location.workspace && entry.uri.toString() !== document.uri.toString() && !entry.summary.error)
     .map((entry) => ({ path: entry.summary.path, title: entry.summary.name }))
     .sort((a, b) => a.path.localeCompare(b.path));
-  return { file: location.path, specs, inheritance: await followParents(location.workspace, location.path, document.getText()) };
+  return {
+    file: location.path,
+    specs,
+    inheritance: await followParents(location.workspace, location.path, document.getText()),
+    keywordIcons: keywordIconsSetting(),
+  };
 }

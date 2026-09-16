@@ -976,6 +976,27 @@
           "default": "specs/generics",
           "markdownDescription": "Folder (relative to each workspace folder) where the **Specs overview** creates new markdown specs (`.spec.md`) by default. All its subfolders are offered as destinations, even empty ones."
         },
+        "sdd.spec.keywordIcons": {
+          "type": "object",
+          "markdownDescription": "Icon written in front of each RFC 2119 key word in the `####` headings of markdown specs, e.g. `#### ✅ MUST`. An empty string writes the key word alone. Specs are read whatever icon they were written with, and get these icons at their next change in the form editor.",
+          "properties": {
+            "MUST": { "type": "string", "default": "✅" },
+            "MUST NOT": { "type": "string", "default": "⛔" },
+            "SHOULD": { "type": "string", "default": "👍" },
+            "SHOULD NOT": { "type": "string", "default": "👎" },
+            "MAY": { "type": "string", "default": "🆗" },
+            "No key word": { "type": "string", "default": "❔", "description": "Heading of the requirements written without a key word in capitals." }
+          },
+          "additionalProperties": false,
+          "default": {
+            "MUST": "✅",
+            "MUST NOT": "⛔",
+            "SHOULD": "👍",
+            "SHOULD NOT": "👎",
+            "MAY": "🆗",
+            "No key word": "❔"
+          }
+        },
         "sdd.otm.threatModelsFolder": {
           "type": "string",
           "default": "specs/threat-models",

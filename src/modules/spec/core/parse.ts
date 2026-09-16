@@ -1,9 +1,14 @@
-import { findKeyword, isConformanceNotice, type Keyword } from './keywords';
+import { CONFORMANCE_NOTICE, findKeyword, isConformanceNotice, levelDefinition, levelIntro, levelOfHeading, levelRank, withoutItalic, WRITTEN_NOTICE, type Keyword } from './keywords';
 
 /**
  * Outline of a markdown spec: title (first `#` heading), description (text before the first `##`),
- * a `## Context` section and a `## Requirements` section: a list of requirements using the
- * RFC 2119 key words, optionally split into `###` groups. Everything else is kept as written.
+ * a `## Context` section and a `## Requirements` section, optionally split into `###` groups. Inside
+ * the section and each group, requirements are listed level by level: a `####` heading per RFC 2119
+ * key word (an icon can come first) with its definition, then a `#####` heading per requirement
+ * holding its sentence, with its description and its example scenarios ("**Title**\" and the case on
+ * the next line) under it.
+ * Requirements written as a list, the layout before key word headings, are still read, in the order
+ * they are written back at the next change. Everything else is kept as written.
  * Line numbers are 0-based indexes into the text split on "\n"; ends are exclusive.
  */
 
@@ -13,35 +18,53 @@ export interface Heading {
   line: number;
 }
 
-/** One concrete case a requirement is illustrated with: a nested "- Example: ..." item under it. */
+/** One concrete case a requirement is illustrated with. */
 export interface Example {
-  /** Text after the "Example:" label; continuation lines are de-indented. */
+  /** Title written in bold above the case; empty when it is only numbered ("**Example 2**"). */
+  title: string;
+  /** The case, written on the lines under its title (after "Example:" in a nested list item). */
   text: string;
   line: number;
   end: number;
-  /** "-", "*", "+", "1." or "1)". */
-  marker: string;
 }
 
 export interface Requirement {
-  /** Sentence of the requirement without its marker and without its examples; continuation lines are de-indented. */
+  /** The sentence: the text of its `#####` heading, or the first paragraph of its list item on one line. */
   text: string;
+  /** Text under the sentence, before the examples: details, rationale. */
+  description: string;
   line: number;
-  /** End of the whole item, examples included. */
+  /** End of the whole requirement, examples included. */
   end: number;
-  /** End of the sentence: where the examples start. */
-  bodyEnd: number;
   /** Example scenarios listed under the requirement. */
   examples: Example[];
-  /** Column the text of the item starts at, so examples are written under it. */
-  indent: number;
-  /** "-", "*", "+", "1." or "1)". */
-  marker: string;
-  /** Task list box ("[ ] ", "[x] ") kept in front of the text. */
+  /** Task list box ("[ ] ", "[x] ") kept in front of the sentence. */
   checkbox: string;
   /** First RFC 2119 key word in capitals, and how it is written ("SHALL" for MUST). */
   keyword?: Keyword;
   written?: string;
+  /** Key word of the `####` heading it is written under, its own key word when there is none. */
+  level?: Keyword;
+  /** Written as a list item, the layout before key word headings. */
+  listItem: boolean;
+}
+
+/** The requirements of one key word: a `####` heading, the definition of the key word, then the requirements. */
+export interface RequirementLevel {
+  /** Undefined for the requirements without a key word. */
+  keyword?: Keyword;
+  /** The first heading written for it; none when its requirements are still written as a list. */
+  heading?: Heading;
+  /** The heading names no level ("#### Notes"): it holds the requirements without a key word and is kept as written. */
+  customHeading: boolean;
+  /**
+   * Text between the heading and the first requirement: the definition of the key word, in italics
+   * whether it is written with them or not, or notes; the definition when no heading is written.
+   */
+  intro: string;
+  /** Position of its first requirement in the list, and how many it has. */
+  start: number;
+  count: number;
 }
 
 /** Requirements written directly under "## Requirements", or under one of its `###` groups. */
@@ -49,11 +72,12 @@ export interface RequirementList {
   /** Range holding the list (after the heading). */
   start: number;
   end: number;
+  /** Level by level (MUST, MUST NOT, SHOULD, SHOULD NOT, MAY, then without key word), as written inside each level. */
   items: Requirement[];
-  /** Blank lines between items (a "loose" list). */
-  loose: boolean;
-  /** Non-blank lines that are not list items (notes, tables...), the conformance sentence aside. */
-  otherContent: boolean;
+  /** The levels holding requirements, or notes of their own, in the same order. */
+  levels: RequirementLevel[];
+  /** Text before the first level that is not a requirement nor the conformance sentence (notes, tables...), kept as written. */
+  notes: string;
 }
 
 export interface RequirementGroup extends RequirementList {
@@ -97,8 +121,8 @@ export interface SpecModel {
   context?: { section: Section; text: string };
   requirements?: {
     section: Section;
-    /** The BCP 14 sentence ("The key words MUST..."). */
-    notice?: { start: number; end: number };
+    /** The BCP 14 sentence ("The key words MUST..."): the one of RFC 8174 in italics, another as written. */
+    notice?: { start: number; end: number; text: string };
     /** Requirements before the first group. */
     list: RequirementList;
     groups: RequirementGroup[];
@@ -116,8 +140,14 @@ const FENCE = /^ {0,3}(`{3,}|~{3,})/;
 const ITEM = /^( {0,3})([-*+]|\d{1,9}[.)])(?:([ \t]+)(\[[ xX]\][ \t]+)?(.*)|[ \t]*)$/;
 /** A list item nested under a requirement, once the item's own indentation is removed. */
 const NESTED_ITEM = /^( {0,3})([-*+]|\d{1,9}[.)])[ \t]+(.*)$/;
-/** "Example:", "Example 2:", "**Example:**"... in front of an example scenario. */
+/** "Example:", "Example 2:", "**Example:**"... in front of an example scenario written as a list item. */
 export const EXAMPLE_LABEL = /^[*_]{0,2}example[ \t]*\d*[*_]{0,2}[ \t]*:[ \t]*[*_]{0,2}[ \t]*/i;
+/** A line in bold (or italics) on its own, a backslash breaking the line: the title of an example scenario, "**Declined card**\". */
+const EXAMPLE_TITLE = /^ {0,3}(?:\*\*([^*]+)\*\*|\*([^*]+)\*|__([^_]+)__|_([^_]+)_)\\?[ \t]*$/;
+/** The title of an example that has none: "Example", "Example 2". */
+const NUMBERED_EXAMPLE = /^example(?:[ \t]*\d+)?$/i;
+/** Lines that start another block than a paragraph. */
+const BLOCK_START = /^ {0,3}(?:[-*+][ \t]|\d{1,9}[.)][ \t]|>|`{3}|~{3}|#{1,6}(?:[ \t]|$)|\|)/;
 /** "Extends: [Title](path)", "**Extends:** path"... */
 const EXTENDS = /^[ \t]*(?:[*_]{1,2})?extends(?:[*_]{1,2})?[ \t]*:[ \t]*(?:[*_]{1,2})?[ \t]*(.+?)[ \t]*$/i;
 /** A markdown link, with the destination in angle brackets when it has spaces. */
@@ -196,8 +226,50 @@ export function blockText(lines: string[], start: number, end: number): string {
   return lines.slice(first, last + 1).join('\n').replace(/\s+$/, '');
 }
 
+/** Last non-blank line of a range, plus one. */
+function contentEnd(lines: string[], start: number, end: number): number {
+  let last = end;
+  while (last > start && isBlank(lines[last - 1])) last--;
+  return last;
+}
+
 /**
- * Splits the content of a requirement into its sentence and its example scenarios: everything from
+ * The title of an example scenario when `line` is one: "**Declined card**\" gives "Declined card",
+ * "**Example 2**\" gives "" (a numbered example has no title of its own); undefined for other lines.
+ */
+export function exampleTitle(line: string): string | undefined {
+  const match = EXAMPLE_TITLE.exec(line);
+  const written = match && (match[1] ?? match[2] ?? match[3] ?? match[4]);
+  // "* a *" is not emphasis, and "*a\*" ends with an escaped star.
+  if (!written || written !== written.trim() || written.endsWith('\\')) return undefined;
+  const title = written.replace(/[ \t]*:$/, '').trim();
+  return NUMBERED_EXAMPLE.test(title) ? '' : title;
+}
+
+/** Text of a requirement heading: the closing #s go, emphasis stays (it belongs to the sentence). */
+function requirementHeadingText(line: string): string {
+  return (HEADING.exec(line)?.[2] ?? '').replace(/(^|[ \t]+)#+$/, '').trim();
+}
+
+/**
+ * A list item written before key word headings: its first paragraph is the sentence, on one line, and
+ * what follows (nested lists, other paragraphs) its description.
+ */
+function sentenceOf(body: string[]): { text: string; description: string } {
+  const inFence = fencedLines(body);
+  let end = 0;
+  while (end < body.length && !isBlank(body[end]) && !(end > 0 && (inFence[end] || BLOCK_START.test(body[end])))) end++;
+  return {
+    text: body
+      .slice(0, end)
+      .map((line) => line.trim())
+      .join(' '),
+    description: blockText(body, end, body.length),
+  };
+}
+
+/**
+ * Splits the content of a list item into its sentence and its example scenarios: everything from
  * the first nested "Example:" item on is examples. `base` is the line the content starts at, so the
  * examples carry their line in the file (content line `i` is line `base + i`).
  */
@@ -217,7 +289,7 @@ function splitExamples(content: string[], base: number): { body: string[]; examp
     const match = inFence[i] ? null : NESTED_ITEM.exec(content[i]);
     if (match) {
       indent = match[1].length + match[2].length + 1;
-      examples.push({ text: '', line: base + i, end: base + i + 1, marker: match[2] });
+      examples.push({ title: '', text: '', line: base + i, end: base + i + 1 });
       parts.push([match[3].replace(EXAMPLE_LABEL, '')]);
     } else if (examples.length) {
       // Continuation of the example above: kept with it, blank lines included.
@@ -233,24 +305,31 @@ function splitExamples(content: string[], base: number): { body: string[]; examp
   return { body: content.slice(0, body), examples };
 }
 
-/** Top-level list items of a range, and whether anything else is written there. */
-export function parseItems(lines: string[], start: number, end: number, inFence: boolean[], skip?: { start: number; end: number }): Omit<RequirementList, 'start' | 'end'> {
+/** List items of a range (requirements written before key word headings), and the notes around them. */
+function parseItems(lines: string[], start: number, end: number, inFence: boolean[], skip?: { start: number; end: number }): { items: Requirement[]; notes: string } {
   const items: Requirement[] = [];
-  let otherContent = false;
-  let loose = false;
+  const notes: string[] = [];
+  let note = -1;
+  const closeNote = (at: number) => {
+    const text = note < 0 ? '' : blockText(lines, note, at);
+    if (text) notes.push(text);
+    note = -1;
+  };
   let line = start;
   while (line < end) {
     if (skip && line >= skip.start && line < skip.end) {
+      closeNote(line);
       line = skip.end;
       continue;
     }
     const text = lines[line];
     const match = inFence[line] ? null : ITEM.exec(text);
     if (!match) {
-      if (!isBlank(text)) otherContent = true;
+      if (note < 0) note = line;
       line++;
       continue;
     }
+    closeNote(line);
     const [, indent, marker, spacing = '', checkbox = '', first = ''] = match;
     const spaces = leadingSpaces(spacing);
     const contentIndent = indent.length + marker.length + (spaces >= 1 && spaces <= 4 && first ? spaces : 1);
@@ -273,25 +352,106 @@ export function parseItems(lines: string[], start: number, end: number, inFence:
       last = next;
       next++;
     }
-    if (items.length && line > items[items.length - 1].end) loose ||= lines.slice(items[items.length - 1].end, line).some(isBlank);
     const { body, examples } = splitExamples(content, line);
-    const itemText = body.join('\n').replace(/\s+$/, '');
-    const keyword = findKeyword(itemText);
+    const { text: sentence, description } = sentenceOf(body);
+    const keyword = findKeyword(sentence);
     items.push({
-      text: itemText,
+      text: sentence,
+      description,
       line,
       end: last + 1,
-      bodyEnd: line + body.length,
       examples,
-      indent: contentIndent,
-      marker,
       checkbox: checkbox.replace(/[ \t]+$/, ' '),
       keyword: keyword?.keyword,
       written: keyword?.written,
+      level: keyword?.keyword,
+      listItem: true,
     });
     line = last + 1;
   }
-  return { items, otherContent, loose };
+  closeNote(end);
+  return { items, notes: notes.join('\n\n') };
+}
+
+/**
+ * A requirement written as a `#####` heading, up to `end`: its sentence, then its description, then its
+ * examples, each starting with a title line in bold at the start of a paragraph. `level` is the
+ * key word of the `####` heading above it, null when there is none.
+ */
+function parseHeadingRequirement(lines: string[], inFence: boolean[], line: number, end: number, level: Keyword | undefined | null): Requirement {
+  const heading = requirementHeadingText(lines[line]);
+  const box = /^(\[[ xX]\])[ \t]+/.exec(heading);
+  const text = box ? heading.slice(box[0].length) : heading;
+  const titles: number[] = [];
+  for (let i = line + 1; i < end; i++) {
+    if (!inFence[i] && (i === line + 1 || isBlank(lines[i - 1])) && exampleTitle(lines[i]) !== undefined) titles.push(i);
+  }
+  const keyword = findKeyword(text);
+  return {
+    text,
+    description: blockText(lines, line + 1, titles[0] ?? end),
+    line,
+    end: contentEnd(lines, line + 1, end),
+    examples: titles.map((title, i) => {
+      const next = titles[i + 1] ?? end;
+      return { title: exampleTitle(lines[title]) ?? '', text: blockText(lines, title + 1, next), line: title, end: contentEnd(lines, title + 1, next) };
+    }),
+    checkbox: box ? `${box[1]} ` : '',
+    keyword: keyword?.keyword,
+    written: keyword?.written,
+    level: level === null ? keyword?.keyword : level,
+    listItem: false,
+  };
+}
+
+/**
+ * The requirements of a range (the section before its first group, or a group): the list items and
+ * notes written first, then the `####` level headings with their `#####` requirements. Requirements
+ * are gathered level by level, so a level written twice, or list items next to headings, read as
+ * they are written back.
+ */
+function parseList(lines: string[], start: number, end: number, inFence: boolean[], headings: Heading[], skip?: { start: number; end: number }): RequirementList {
+  const inside = headings.filter((h) => h.line >= start && h.line < end && (h.level === 4 || h.level === 5));
+  const { items: listed, notes } = parseItems(lines, start, inside[0]?.line ?? end, inFence, skip);
+  const byRank = new Map<number, { keyword?: Keyword; heading?: Heading; customHeading: boolean; intros: string[]; items: Requirement[] }>();
+  const levelOf = (keyword: Keyword | undefined) => {
+    const rank = levelRank(keyword);
+    const found = byRank.get(rank) ?? { keyword, customHeading: false, intros: [], items: [] };
+    byRank.set(rank, found);
+    return found;
+  };
+  for (const item of listed) levelOf(item.level).items.push(item);
+  let current: Keyword | undefined | null = null;
+  for (const [i, heading] of inside.entries()) {
+    const next = inside[i + 1]?.line ?? end;
+    if (heading.level === 4) {
+      const named = levelOfHeading(heading.text);
+      current = named?.keyword;
+      const level = levelOf(current);
+      if (!level.heading) {
+        level.heading = heading;
+        level.customHeading = !named;
+      }
+      const written = blockText(lines, heading.line + 1, next);
+      const intro = withoutItalic(written) === levelDefinition(current) ? levelIntro(current) : written;
+      if (intro && !level.intros.includes(intro)) level.intros.push(intro);
+    } else {
+      const item = parseHeadingRequirement(lines, inFence, heading.line, next, current);
+      levelOf(item.level).items.push(item);
+    }
+  }
+
+  const items: Requirement[] = [];
+  const levels: RequirementLevel[] = [];
+  for (const rank of [...byRank.keys()].sort((a, b) => a - b)) {
+    const { keyword, heading, customHeading, intros, items: own } = byRank.get(rank)!;
+    const intro = heading ? intros.join('\n\n') : levelIntro(keyword);
+    // A level left with only its definition is not written back.
+    if (!own.length && (!intro || intro === levelIntro(keyword))) continue;
+    levels.push({ keyword, heading, customHeading, intro, start: items.length, count: own.length });
+    items.push(...own);
+  }
+  return { start, end, items, levels, notes };
 }
 
 /** The conformance sentence: a paragraph (not a list item) mentioning the key words and RFC 2119. */
@@ -300,7 +460,9 @@ function findNotice(lines: string[], start: number, end: number, inFence: boolea
     if (isBlank(lines[line]) || inFence[line] || ITEM.test(lines[line]) || (line > start && !isBlank(lines[line - 1]))) continue;
     let last = line;
     while (last + 1 < end && !isBlank(lines[last + 1]) && !inFence[last + 1] && !ITEM.test(lines[last + 1])) last++;
-    if (isConformanceNotice(lines.slice(line, last + 1).join(' '))) return { start: line, end: last + 1 };
+    const written = lines.slice(line, last + 1).join('\n');
+    // The sentence of RFC 8174 is written in italics; other wordings are kept as written.
+    if (isConformanceNotice(written)) return { start: line, end: last + 1, text: withoutItalic(written) === CONFORMANCE_NOTICE ? WRITTEN_NOTICE : written };
   }
   return undefined;
 }
@@ -405,18 +567,21 @@ export function parseSpecMarkdown(text: string): SpecModel {
 
   const requirements = sections.find((s) => s.kind === 'requirements');
   if (requirements) {
-    const subheadings = headings.filter((h) => h.level === 3 && h.line > requirements.heading.line && h.line < requirements.end);
+    const inside = headings.filter((h) => h.line > requirements.heading.line && h.line < requirements.end);
+    const groupHeadings = inside.filter((h) => h.level === 3);
     const listStart = requirements.heading.line + 1;
-    const listEnd = subheadings[0]?.line ?? requirements.end;
-    const notice = findNotice(lines, listStart, listEnd, inFence);
+    const listEnd = groupHeadings[0]?.line ?? requirements.end;
+    // The conformance sentence comes before the first requirement.
+    const noticeEnd = inside.find((h) => h.level >= 3)?.line ?? requirements.end;
+    const notice = findNotice(lines, listStart, noticeEnd, inFence);
     model.requirements = {
       section: requirements,
       notice,
-      list: { start: listStart, end: listEnd, ...parseItems(lines, listStart, listEnd, inFence, notice) },
-      groups: subheadings.map((heading, i) => {
-        const end = subheadings[i + 1]?.line ?? requirements.end;
-        return { heading, start: heading.line + 1, end, ...parseItems(lines, heading.line + 1, end, inFence) };
-      }),
+      list: parseList(lines, listStart, listEnd, inFence, inside, notice),
+      groups: groupHeadings.map((heading, i) => ({
+        heading,
+        ...parseList(lines, heading.line + 1, groupHeadings[i + 1]?.line ?? requirements.end, inFence, inside),
+      })),
     };
   }
   return model;
