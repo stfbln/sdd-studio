@@ -268,3 +268,122 @@
   flex-wrap: nowrap;
   align-items: flex-start;
 }
+
+/* Diagram export */
+
+.diagram-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.diagram-tools .search {
+  flex: 1 1 18ch;
+  margin: 0;
+}
+
+.diagram-group + .diagram-group {
+  margin-top: 10px;
+}
+
+.diagram-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+  border-bottom: 1px solid var(--sdd-border);
+}
+
+.diagram-group-label {
+  font-weight: 600;
+}
+
+.diagram-empty {
+  margin: 2px 0 2px 4px;
+}
+
+.diagram-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  border-radius: var(--sdd-radius);
+}
+
+.diagram-row:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.diagram-row-label {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 0;
+  cursor: pointer;
+}
+
+.diagram-row-label .path-label {
+  flex: 0 1 auto;
+}
+
+/* How a related entity relates to the focus: "used by Shop API". */
+.diagram-connection {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--vscode-textLink-foreground);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diagram-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.diagram-fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 18ch;
+  margin: 0;
+  padding: 4px 10px 8px;
+  border: 1px solid var(--sdd-border);
+  border-radius: var(--sdd-radius);
+}
+
+.diagram-fieldset legend {
+  padding: 0 4px;
+  font-size: 0.9em;
+  color: var(--sdd-muted);
+}
+
+.diagram-export {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.diagram-export .field {
+  flex: 1 1 24ch;
+  margin: 0;
+}
+
+.diagram-code {
+  max-height: 24em;
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  overflow: auto;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 0.9em;
+  white-space: pre;
+  background: var(--vscode-textCodeBlock-background, var(--sdd-card-bg));
+  border: 1px solid var(--sdd-border);
+  border-radius: var(--sdd-radius);
+}

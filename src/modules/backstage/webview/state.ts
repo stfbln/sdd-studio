@@ -51,6 +51,6 @@ export const entityLocation = (index: number): CatalogLocation => ({ kind: 'enti
 
 /** Falls back to the overview when the entity no longer exists (deleted in the text...). */
 export function validLocation(spec: unknown, location: CatalogLocation): CatalogLocation {
-  if (location.kind === 'entity' && entityAt(spec, location.index)) return location;
-  return { kind: 'overview' };
+  if (location.kind !== 'entity') return location;
+  return entityAt(spec, location.index) ? location : { kind: 'overview' };
 }

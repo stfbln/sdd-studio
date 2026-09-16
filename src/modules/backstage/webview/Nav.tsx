@@ -222,6 +222,10 @@ export function Nav({ current }: { current: CatalogLocation }) {
         <span className="codicon codicon-type-hierarchy" aria-hidden="true" />
         <span className="path-label">Overview</span>
       </NavItem>
+      <NavItem active={current.kind === 'diagram'} onClick={() => navigate({ kind: 'diagram' })}>
+        <span className="codicon codicon-graph" aria-hidden="true" />
+        <span className="path-label">Diagram</span>
+      </NavItem>
 
       <AddableGroup title="Software" count={software.length} categories={HIERARCHY as Exclude<Category, 'other'>[]} onAdd={add}>
         {renderRows(software)}

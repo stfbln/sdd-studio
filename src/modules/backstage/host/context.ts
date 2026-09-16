@@ -6,6 +6,7 @@ import type { JsonObject } from '../../../shared/structured/edits';
 import { parseYamlDocuments } from '../../../shared/structured/yamlDocuments';
 import type { OtmOutline } from '../../otm/core/summary';
 import { referencedPaths } from '../core/edits';
+import { diagramsFolder } from './diagramFile';
 import { categoryOf, DEFAULT_NAMESPACE, SPEC_FILE_KINDS, str, summarizeEntity, type CatalogContext, type EntitySummary, type SpecFileInfo, type SpecFileKind, type ThreatModelOutline } from '../core/model';
 
 const MAX_SPEC_FILES = 2000;
@@ -79,7 +80,7 @@ export async function computeCatalogContext(document: vscode.TextDocument, catal
   const files = parsed.ok
     ? await existingFiles(location.workspace, referencedPaths(parsed.value, location.path), [...specFiles.map((f) => f.path), ...catalogFiles, location.path])
     : {};
-  return { file: location.path, specFiles, entities, catalogFiles, threatModels, files };
+  return { file: location.path, specFiles, entities, catalogFiles, threatModels, files, diagramsFolder: diagramsFolder() };
 }
 
 /** Fires when any spec index changes (spec files or catalog files added, renamed, edited). */

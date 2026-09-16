@@ -53,7 +53,10 @@ const RESOURCE_CATEGORIES: Record<string, Category> = {
   [SITE_TYPE]: 'site',
 };
 
-export type CatalogLocation = { kind: 'overview' } | { kind: 'entity'; index: number };
+/** The `spec.type` a Resource of this category is written with, when the category comes from a type. */
+export const resourceTypeOf = (category: Category): string | undefined => Object.keys(RESOURCE_CATEGORIES).find((type) => RESOURCE_CATEGORIES[type] === category);
+
+export type CatalogLocation = { kind: 'overview' } | { kind: 'entity'; index: number } | { kind: 'diagram' };
 
 export type Category =
   | 'domain'
@@ -189,6 +192,8 @@ export interface CatalogContext {
   threatModels: ThreatModelOutline[];
   /** Whether each workspace path referenced by the edited file exists. */
   files: Record<string, boolean>;
+  /** Folder exported diagrams are written to (setting `sdd.backstage.diagramsFolder`). */
+  diagramsFolder?: string;
   /** Consolidated view of every catalog file of the workspace folder. */
   consolidated?: {
     /** Name of the workspace folder. */
@@ -500,22 +505,24 @@ export const summaryLabel = (e: EntitySummary) => e.title || e.name;
 /* Hierarchy ---------------------------------------------------------------- */
 
 /** Fields placing an entity below another one in the outline, by priority. */
-const PARENT_FIELDS = ['subcomponentOf', 'system', 'subdomainOf', 'domain', 'parent'];
+export const PARENT_FIELDS = ['subcomponentOf', 'system', 'subdomainOf', 'domain', 'parent'];
 
 /**
- * Parent in the hierarchy (subcomponent, system, domain, parent group), as an entity key. A network
- * sits in the first network it depends on, which needs the known entities to tell networks apart.
+ * The relation placing an entity below another one (subcomponent, system, domain, parent group). A
+ * network sits in the first network it depends on, which needs the known entities to tell networks
+ * apart.
  */
-export function parentKey(summary: EntitySummary, known: EntitySummary[] = []): string | undefined {
+export function parentRelation(summary: EntitySummary, known: EntitySummary[] = []): { field: string; target: string } | undefined {
   if (summary.category === 'network') {
     const parent = summary.relations.find((r) => r.field === 'dependsOn' && known.some((e) => e.key === r.target && e.category === 'network'));
-    if (parent) return parent.target;
+    if (parent) return parent;
   }
-  for (const field of PARENT_FIELDS) {
-    const relation = summary.relations.find((r) => r.field === field);
-    if (relation) return relation.target;
-  }
-  return undefined;
+  return PARENT_FIELDS.flatMap((field) => summary.relations.filter((r) => r.field === field)).at(0);
+}
+
+/** Parent in the hierarchy, as an entity key (see `parentRelation`). */
+export function parentKey(summary: EntitySummary, known: EntitySummary[] = []): string | undefined {
+  return parentRelation(summary, known)?.target;
 }
 
 /** Ancestors of an entity (closest first), stopping on loops. */

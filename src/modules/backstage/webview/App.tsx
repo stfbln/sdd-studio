@@ -9,6 +9,7 @@ import { withFileEdits } from '../core/consolidated';
 import { analyzeCatalog } from '../core/analysis';
 import { sourceLocationEdits } from '../core/edits';
 import { documentFiles, documentsOf, entitiesOf, knownEntities, type CatalogContext, type CatalogLocation } from '../core/model';
+import { DiagramPage, NEW_DIAGRAM, type DiagramSettings } from './DiagramPage';
 import { EntityPage } from './EntityPage';
 import { Nav } from './Nav';
 import { OverviewPage } from './OverviewPage';
@@ -21,6 +22,8 @@ export function App() {
 
   const [chosenTarget, setTarget] = useState('');
   const [filter, setFilter] = useState('');
+  // Kept here so the choice of entities survives a visit to another page.
+  const [diagram, setDiagram] = useState<DiagramSettings>(NEW_DIAGRAM);
   const files = spec ? documentFiles(spec) : undefined;
   const current = spec ? validLocation(spec, doc.location) : doc.location;
   const catalogFiles = [...new Set([...(context?.catalogFiles ?? []), ...(files ?? [])])].sort();
@@ -94,7 +97,13 @@ export function App() {
           unsupported={notCatalog ? 'This file is not a Backstage catalog file (no document has a "kind").' : undefined}
           nav={<Nav current={current} />}
         >
-          {current.kind === 'entity' ? <EntityPage key={current.index} index={current.index} /> : <OverviewPage />}
+          {current.kind === 'entity' ? (
+            <EntityPage key={current.index} index={current.index} />
+          ) : current.kind === 'diagram' ? (
+            <DiagramPage settings={diagram} onChange={setDiagram} />
+          ) : (
+            <OverviewPage />
+          )}
         </EditorFrame>
       </WorkspaceContext.Provider>
     </SpecEditorContext.Provider>

@@ -13,6 +13,7 @@ import { catalogInstructions } from '../core/instructions';
 import type { CatalogContext } from '../core/model';
 import type { NewSpecFileRequest } from '../core/brief';
 import { existingFiles, onAnySpecChange, workspaceSpecs } from './context';
+import { diagramsFolder, exportDiagram, type DiagramExportRequest } from './diagramFile';
 import { createSpecFileFromCatalog } from './newSpecFile';
 
 export const CONSOLIDATED_VIEW_TYPE = 'sdd.backstage.consolidatedCatalog';
@@ -132,13 +133,24 @@ export class ConsolidatedCatalogPanel {
       case 'request': {
         const { requestId } = message;
         try {
-          if (message.name !== 'newSpecFile') throw new Error(`Unknown request "${message.name}".`);
-          this.post({ type: 'response', requestId, value: await createSpecFileFromCatalog(this.workspace, message.payload as NewSpecFileRequest) });
+          this.post({ type: 'response', requestId, value: await this.runRequest(message.name, message.payload) });
         } catch (err) {
           this.post({ type: 'response', requestId, error: err instanceof Error ? err.message : String(err) });
         }
         return;
       }
+    }
+  }
+
+  /** Work the form waits on: creating a spec file for an entity, exporting a diagram. */
+  private runRequest(name: string, payload: unknown): Promise<unknown> {
+    switch (name) {
+      case 'newSpecFile':
+        return createSpecFileFromCatalog(this.workspace, payload as NewSpecFileRequest);
+      case 'exportDiagram':
+        return exportDiagram(this.workspace, payload as DiagramExportRequest);
+      default:
+        return Promise.reject(new Error(`Unknown request "${name}".`));
     }
   }
 
@@ -191,6 +203,7 @@ export class ConsolidatedCatalogPanel {
       catalogFiles: this.catalogPaths,
       threatModels,
       files,
+      diagramsFolder: diagramsFolder(),
       consolidated: { folder: this.folder?.name ?? '', brokenFiles: this.brokenFiles },
     };
     this.post({ type: 'context', value: context });

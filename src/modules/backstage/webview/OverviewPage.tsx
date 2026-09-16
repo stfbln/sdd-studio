@@ -20,7 +20,7 @@ export function OverviewPage() {
   // In the consolidated view, problems say which file they are about.
   const shownIssues = files
     ? issues
-        .filter((i) => i.location.kind === 'overview' || !shownFile || files[i.location.index] === shownFile)
+        .filter((i) => i.location.kind !== 'entity' || !shownFile || files[i.location.index] === shownFile)
         .map((i) => (i.location.kind === 'entity' ? { ...i, message: `${files[i.location.index]} · ${i.message}` } : i))
     : issues;
   const software = local.filter((e) => ['component', 'api', 'resource', 'dataAsset', 'artifact', 'system'].includes(e.category));

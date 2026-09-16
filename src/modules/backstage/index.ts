@@ -12,6 +12,7 @@ import { looksLikeCatalog } from './core/summary';
 import { catalogKind } from './host/catalogKind';
 import { ConsolidatedCatalogPanel } from './host/ConsolidatedCatalogPanel';
 import { computeCatalogContext, onAnySpecChange } from './host/context';
+import { exportDiagram, type DiagramExportRequest } from './host/diagramFile';
 import { createSpecFileFromCatalog, workspaceIndexOf } from './host/newSpecFile';
 import type { NewSpecFileRequest } from './core/brief';
 
@@ -34,7 +35,10 @@ export const backstageModule: SddModule = {
         apply: (text, _format, edits) => applyYamlDocumentEdits(text, edits as SpecEdit[]),
       },
       commands: { consolidated: 'sdd.backstage.openConsolidatedCatalog', newCatalogFile: 'sdd.backstage.newCatalogFile' },
-      requests: { newSpecFile: (document, payload) => createSpecFileFromCatalog(workspaceIndexOf(document), payload as NewSpecFileRequest) },
+      requests: {
+        newSpecFile: (document, payload) => createSpecFileFromCatalog(workspaceIndexOf(document), payload as NewSpecFileRequest),
+        exportDiagram: (document, payload) => exportDiagram(workspaceIndexOf(document), payload as DiagramExportRequest),
+      },
       context: {
         compute: (document) => computeCatalogContext(document, index),
         onDidChange: onAnySpecChange(),

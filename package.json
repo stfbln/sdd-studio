@@ -993,6 +993,11 @@
           "default": "specs/catalogs",
           "markdownDescription": "Folder (relative to each workspace folder) where the **Software Catalog overview** creates new Backstage catalog files (`.catalog-info.yaml`) by default. All its subfolders are offered as destinations, even empty ones."
         },
+        "sdd.backstage.diagramsFolder": {
+          "type": "string",
+          "default": "docs/diagrams",
+          "markdownDescription": "Folder (relative to each workspace folder) where the **Diagram** page of the software catalog saves exported Mermaid diagrams, as markdown files holding a ```mermaid block."
+        },
         "sdd.openslo.specsFolder": {
           "type": "string",
           "default": "specs/slos",

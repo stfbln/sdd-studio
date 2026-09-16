@@ -424,6 +424,23 @@ spec:
 
 **Checks:** what Backstage rejects (missing `apiVersion`, `kind`, name or required spec fields such as type, lifecycle, owner, definition, children, member of, target; invalid names, namespaces, tags, label and annotation keys; references that are not entity references, lack a kind where Backstage needs one — `dependsOn: [component:x]` — or point to the wrong kind; the same entity twice in a file; parents forming a loop, trust zones not written `file#id`), and warnings for references not defined in the workspace catalog files, entities also defined in another file, unknown lifecycles, linked spec files, threat models, API definitions or location targets that do not exist, trust zones missing from their threat model, networks and threat models placing an entity differently, IP ranges that are not CIDR blocks, package URLs that do not look like purls, references (repository, produced by, deployed on, site…) pointing to the wrong kind of entity, and repositories without a URL.
 
+**Diagrams (Mermaid).** The **Diagram** page of the outline exports a chosen part of the catalog as a [Mermaid](https://mermaid.js.org/) flowchart, to draw C4 context (C1) and container (C2) diagrams. It asks four questions:
+
+1. **What the diagram is about:** pick one or more entities from the tree of the outline (Software, Infrastructure, Code and artifacts, Organization), with a filter, a **Select all** per group and, next to an entity that holds others, a button taking it with everything inside it. They get a stronger outline in the diagram.
+2. **What else to include:** everything the focus is connected to, and nothing else — entities the catalog records no relationship with are not listed. They come grouped by how they relate: **Around it** (the system, domain or network holding the focus), **Inside it** (what it holds), then **APIs**, **Dependencies**, **Deployment**, **Code and artifacts** and **Ownership**, each row saying what the entity is and how it relates (*provides Petstore API*, *used by Shop API*, *hosts Shop API*). Ticking one also turns on the kind of arrow that explains why it is there, so the diagram says it; **Add all** takes a whole group. The target button next to an entity moves it into the focus, so what *it* connects to shows up in turn.
+3. **Anything unrelated to add:** folded away until asked for, the rest of the catalog as the same tree — for entities the catalog does not link to the focus yet.
+4. **Look:** what each box says, the direction, and which groups of relationships become arrows.
+
+Then:
+
+- **The hierarchy is nesting, not arrows:** an entity is drawn inside the entity it belongs to (a component in its system, a system in its domain, a subcomponent in its component, a network in its parent network). Leaving an entity out does not lose its parts: they move up to the closest entity that is drawn.
+- **The other relationships become labelled arrows,** by group: **APIs** (`provides`, `consumes`), **Dependencies** (`uses`), **Deployment** (`runs in` a network, `runs on` a platform, `hosted at` a site), **Code and artifacts** (`code in`, `builds`) and **Ownership** (`owns`), the last three dashed and off by default. Both sides of a relationship (`dependsOn` and `dependencyOf`) give one arrow.
+- **What each box says:** the display name alone, or the name with what the entity is (`[Component · service]`) and its description, wrapped to keep boxes narrow. Direction is left to right or top to bottom. The entities the diagram is about keep a thicker outline.
+- Shapes and colours come from the kind of entity (APIs are rounded, resources are cylinders, data assets are slanted, networks and sites are hexagons, teams are rounded boxes) and are written in the diagram itself, so it looks the same wherever it is rendered.
+- **Copy** puts the Mermaid source on the clipboard; **Save as markdown** writes it to `docs/diagrams/<title>.md` inside a ```` ```mermaid ```` block (GitHub, GitLab and the VS Code markdown preview render it) and opens it, asking first when the file already exists.
+
+Samples exported from `samples/catalog/online-shop.catalog-info.yaml`: `samples/diagrams/online-shop-containers.md` (the system with its components, APIs, database and data asset) and `samples/diagrams/online-shop-deployment.md` (the same parts with the networks, cluster, VM and site they run on).
+
 **Consolidated catalog.** **SDD Software Catalog: Open Consolidated Catalog** (also in the editor title bar of a catalog file, the Explorer context menu of a folder and the SDD Studio menu) shows every catalog file of a workspace folder merged in one form, so you can keep a catalog for shared things (teams, networks, repositories) and one per organization or system, and still work on everything at once:
 
 - The outline, overview, coverage and problems cover all the files. **All catalog files** at the top of the outline narrows it to one file; problems on the overview start with their file.
@@ -437,6 +454,7 @@ spec:
 Settings:
 
 - `sdd.backstage.catalogFolder` (default `specs/catalogs`): default folder for new catalog files in the Software Catalog overview.
+- `sdd.backstage.diagramsFolder` (default `docs/diagrams`): folder where the Diagram page saves exported Mermaid diagrams.
 
 Sample: `samples/catalog/online-shop.catalog-info.yaml` (a domain, a system, a service and a CLI, two APIs pointing to the sample OpenAPI and AsyncAPI files, a database, a data asset, two networks standing for the trust zones of the sample threat model, a GitLab repository, an image built by the service, one built by the repository and an external PostgreSQL image, a Kubernetes cluster and a VM deployed on an AWS site, and two teams, linked to the sample markdown spec, feature and threat model).
 
