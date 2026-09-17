@@ -7,7 +7,7 @@ import { applyEditsToValue, type SpecEdit } from '../../../shared/structured/edi
 import { postToHost } from '../../../webview/structured/useStructuredDocument';
 import { withFileEdits } from '../core/consolidated';
 import { analyzeCatalog } from '../core/analysis';
-import { sourceLocationEdits } from '../core/edits';
+import { droppedRelationshipEdits, sourceLocationEdits } from '../core/edits';
 import { documentFiles, documentsOf, entitiesOf, knownEntities, type CatalogContext, type CatalogLocation } from '../core/model';
 import { DiagramPage, NEW_DIAGRAM, type DiagramSettings } from './DiagramPage';
 import { EntityPage } from './EntityPage';
@@ -30,11 +30,14 @@ export function App() {
   const pageFile = files && current.kind === 'entity' ? files[current.index] : undefined;
   const target = pageFile ?? (catalogFiles.includes(chosenTarget) ? chosenTarget : filter || catalogFiles[0] || '');
 
-  /** Adds the catalog files of new entities (consolidated view) and keeps source locations in line. */
+  /** Adds the catalog files of new entities (consolidated view), keeps source locations in line and drops the relationships of removed dependencies. */
   const editIn = (file: string, input: SpecEdit | SpecEdit[]) => {
     if (!spec) return;
     const edits = withFileEdits(spec, Array.isArray(input) ? input : [input], file);
-    const extra = sourceLocationEdits(spec, applyEditsToValue(spec, edits), context);
+    const after = applyEditsToValue(spec, edits);
+    const locations = sourceLocationEdits(spec, after, context);
+    const relationships = droppedRelationshipEdits(spec, locations.length ? applyEditsToValue(after, locations) : after);
+    const extra = [...locations, ...relationships];
     actions.edit(extra.length ? [...edits, ...extra] : edits);
   };
 

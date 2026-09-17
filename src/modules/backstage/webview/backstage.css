@@ -387,3 +387,9 @@
   border: 1px solid var(--sdd-border);
   border-radius: var(--sdd-radius);
 }
+
+/* Relationships */
+
+.relationship-input {
+  width: 16ch;
+}

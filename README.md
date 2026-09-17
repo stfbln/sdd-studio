@@ -387,7 +387,7 @@ The outline shows the file as a hierarchy:
 | --- | --- |
 | Domain | Owner, parent domain, type; its systems and subdomains (with **Add system** / **Add subdomain**) |
 | System | Owner, domain, type; its components, APIs, resources and data assets (with add buttons), and a **coverage** table of what each part implements and the threat models applying to it |
-| Component | Type (service, website, library, cli, mobile-app…), lifecycle, owner, system, parent component; **specifications**, **threat models**, provided and consumed APIs, **code** (repository and path), the **platforms and infrastructure** it is deployed on, the **networks** it runs in, **data assets** and **artifacts** it uses, dependencies, subcomponents |
+| Component | Type (service, website, library, cli, mobile-app…), lifecycle, owner, system, parent component; **specifications**, **threat models**, provided and consumed APIs, **code** (repository and path), the **platforms and infrastructure** it is deployed on, the **networks** it runs in or uses, **data assets** and **artifacts** it uses, dependencies and **what it does with each one** (reads from, calls…), subcomponents |
 | API | Type, lifecycle, owner, system, and the **definition**: a spec file of the workspace, written as `$text: ../api/orders.openapi.yaml` so Backstage shows it |
 | Resource | Type (database, queue, s3-bucket, external-service…), owner, system, networks, data assets, artifacts, platforms and infrastructure it is deployed on, code, dependencies, specifications, threat models |
 | Data asset | A Resource of type `data-asset`: classification (public, internal, confidential, restricted), owner, system, the resources storing it, threat models. The components and resources using it are listed under Relations |
@@ -400,7 +400,7 @@ The outline shows the file as a hierarchy:
 | Group / User | Type, parent, display name, email, child groups, members; groups also list what they own |
 | Location | Type, target and targets, with a picker of the other catalog files of the workspace |
 
-Every page starts with the title and the **description** of the entity, edits the name, namespace, tags, links, labels and annotations, and lists the **relations** pointing to the entity (owns, provided by, consumed by, used by, runs in this network, produces, holds code for, deployed here, hosts, members…). Descriptions also show when hovering entity links and in contents lists.
+Every page starts with the title and the **description** of the entity, edits the name, namespace, tags, links, labels and annotations, and lists the **relations** pointing to the entity (owns, provided by, consumed by, used by, runs in this network, uses this network, reads from this resource, produces, holds code for, deployed here, hosts, members…). Descriptions also show when hovering entity links and in contents lists.
 
 **Linking specs and threat models.** The form knows the spec files of the workspace (from the other modules) and the entities of the other catalog files:
 
@@ -446,11 +446,27 @@ spec:
     - resource:card-data  # data asset
 ```
 
-**Networks and threat models.** A network points to a trust zone of an Open Threat Model file (`sdd-studio/trust-zone: ../threat-models/online-shop.otm.yaml#private`). Components and resources run in networks through `dependsOn` entries, so the Backstage graph shows them too. When a threat model applies to an entity and has a component with the same id (or name), the form compares both sides: *Online shop places Orders database in trust zone Private network, like its networks*. A difference is reported as a problem, with a **Place it like the threat model** button. **Import networks from a threat model…** on the overview creates one network per trust zone that has none yet in the workspace, nested like the trust zones and named after their ids.
+**Networks and threat models.** A network points to a trust zone of an Open Threat Model file (`sdd-studio/trust-zone: ../threat-models/online-shop.otm.yaml#private`). Components and resources run in networks through `dependsOn` entries, so the Backstage graph shows them too; a network they only use or connect to (the internet reached by a service running in the private network) says so in its relationship, and is not where they run. When a threat model applies to an entity and has a component with the same id (or name), the form compares both sides: *Online shop places Orders database in trust zone Private network, like its networks*. A difference is reported as a problem, with a **Place it like the threat model** button. **Import networks from a threat model…** on the overview creates one network per trust zone that has none yet in the workspace, nested like the trust zones and named after their ids.
 
 **Repositories and artifacts.** A component, API, resource, artifact, network, platform or infrastructure names the repository holding its code and the path inside it (`sdd-studio/repository`, `sdd-studio/repository-path`). The form then writes Backstage's own `backstage.io/source-location` (for example `url:https://gitlab.com/acme/shop/-/tree/main/services/shop-api/`) and keeps it up to date when the repository URL, provider, branch or path changes; a value written by hand is left alone. Web layouts are known for GitLab, GitHub, Gitea and Bitbucket; other providers get the repository URL when there is no sub-path, and Perforce or Subversion servers without a web URL get no source location. An artifact is produced by a component, system, team or repository of the catalog (`sdd-studio/produced-by`) or supplied by an external organization (`sdd-studio/supplier`), and components use it through `dependsOn`.
 
 **Platforms, infrastructure and sites.** A component or resource names the platforms and infrastructure it is **deployed on** (`sdd-studio/deployed-on`, a comma-separated list of Resources of type `platform` or `infrastructure`, e.g. a Kubernetes cluster or a VM), shown as a checklist next to the ones for networks, data assets and artifacts, and as a **Deployed here** list on the platform or infrastructure page. A network, platform or piece of infrastructure can point to the **site** (`sdd-studio/site`) it runs in: a Resource of type `site` standing for a cloud provider region or a physical location, with a cloud provider (`sdd-studio/cloud-provider`: aws, azure, gcp, on-prem…) and a region or address (`sdd-studio/region`).
+
+**Relationships.** A `dependsOn` entry only says that an entity depends on another one; by default a component or resource *runs in* a network and *uses* anything else. When that is not what it does, the field next to the dependency (in the Networks, Data assets and Artifacts checklists, and under **Dependencies** for the other ones) says it: picked from *runs in*, *uses*, *connects to*, *calls*, *reads from*, *writes to*, *reads and writes*, *publishes to*, *subscribes to*, *deploys to*, or typed. It is written in `sdd-studio/relationships`, the relationship before the entry of `dependsOn` it is about, and the default is never written. Only the networks an entity runs in place it: they are compared with the threat model, become its trust zones and are drawn as deployment. Diagram arrows and the page of the other entity (*Uses this network*, *Reads from this resource*) say the relationship. Renaming a dependency updates its relationship, removing it removes the relationship, and a relationship naming no dependency is reported.
+
+```yaml
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: shop-api
+  annotations:
+    sdd-studio/relationships: uses resource:internet, reads and writes resource:orders-db
+spec:
+  dependsOn:
+    - resource:private     # runs in the private network
+    - resource:internet    # uses the internet
+    - resource:orders-db   # reads and writes the database
+```
 
 ```yaml
 apiVersion: backstage.io/v1alpha1
@@ -473,7 +489,7 @@ spec:
 - **Names:** renaming an entity (Enter or leaving the field) also updates the references of this file, keeping how each one is written. New entities get a name made from their title (`Shop API` → `shop-api`), unique for their kind, and the fields Backstage requires: components and APIs start `experimental`, owners default to the owner most used in the file.
 - **Deleting** an entity removes the list entries pointing to it (provided APIs, dependencies, members…). Single references (owner, system…) are kept and reported, and the delete button says how many are concerned.
 
-**Checks:** what Backstage rejects (missing `apiVersion`, `kind`, name or required spec fields such as type, lifecycle, owner, definition, children, member of, target; invalid names, namespaces, tags, label and annotation keys; references that are not entity references, lack a kind where Backstage needs one — `dependsOn: [component:x]` — or point to the wrong kind; the same entity twice in a file; parents forming a loop, trust zones not written `file#id`), and warnings for references not defined in the workspace catalog files, entities also defined in another file, unknown lifecycles, linked spec files, threat models, API definitions or location targets that do not exist, trust zones missing from their threat model, networks and threat models placing an entity differently, IP ranges that are not CIDR blocks, package URLs that do not look like purls, references (repository, produced by, deployed on, site…) pointing to the wrong kind of entity, and repositories without a URL.
+**Checks:** what Backstage rejects (missing `apiVersion`, `kind`, name or required spec fields such as type, lifecycle, owner, definition, children, member of, target; invalid names, namespaces, tags, label and annotation keys; references that are not entity references, lack a kind where Backstage needs one — `dependsOn: [component:x]` — or point to the wrong kind; the same entity twice in a file; parents forming a loop, trust zones not written `file#id`), and warnings for references not defined in the workspace catalog files, entities also defined in another file, unknown lifecycles, linked spec files, threat models, API definitions or location targets that do not exist, trust zones missing from their threat model, networks and threat models placing an entity differently, IP ranges that are not CIDR blocks, package URLs that do not look like purls, references (repository, produced by, deployed on, site…) pointing to the wrong kind of entity, relationships that are not written `relationship kind:name` or name no dependency, and repositories without a URL.
 
 **Diagrams (Mermaid).** The **Diagram** page of the outline exports a chosen part of the catalog as a [Mermaid](https://mermaid.js.org/) flowchart, to draw C4 context (C1) and container (C2) diagrams. It asks four questions:
 
@@ -485,7 +501,7 @@ spec:
 Then:
 
 - **The hierarchy is nesting, not arrows:** an entity is drawn inside the entity it belongs to (a component in its system, a system in its domain, a subcomponent in its component, a network in its parent network). Leaving an entity out does not lose its parts: they move up to the closest entity that is drawn.
-- **The other relationships become labelled arrows,** by group: **APIs** (`provides`, `consumes`), **Dependencies** (`uses`), **Deployment** (`runs in` a network, `runs on` a platform, `hosted at` a site), **Code and artifacts** (`code in`, `builds`) and **Ownership** (`owns`), the last three dashed and off by default. Both sides of a relationship (`dependsOn` and `dependencyOf`) give one arrow.
+- **The other relationships become labelled arrows,** by group: **APIs** (`provides`, `consumes`), **Dependencies** (`uses`, or the relationship written: `reads from`, `calls`, `uses` a network…), **Deployment** (`runs in` a network, `runs on` a platform, `hosted at` a site), **Code and artifacts** (`code in`, `builds`) and **Ownership** (`owns`), the last three dashed and off by default. Both sides of a relationship (`dependsOn` and `dependencyOf`) give one arrow.
 - **What each box says:** the display name alone, or the name with what the entity is (`[Component · service]`) and its description, wrapped to keep boxes narrow. Direction is left to right or top to bottom. The entities the diagram is about keep a thicker outline.
 - Shapes and colours come from the kind of entity (APIs are rounded, resources are cylinders, data assets are slanted, networks and sites are hexagons, teams are rounded boxes) and are written in the diagram itself, so it looks the same wherever it is rendered.
 - **Copy** puts the Mermaid source on the clipboard; **Save as markdown** writes it to `docs/diagrams/<title>.md` inside a ```` ```mermaid ```` block (GitHub, GitLab and the VS Code markdown preview render it) and opens it, asking first when the file already exists.

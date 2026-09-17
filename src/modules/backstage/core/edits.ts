@@ -6,7 +6,11 @@ import {
   API_VERSION,
   CATEGORIES,
   ARTIFACT_TYPE,
+  cleanRelationship,
   codeLocationOf,
+  defaultRelationship,
+  RELATIONSHIPS_ANNOTATION,
+  relationshipEntries,
   DATA_ASSET_TYPE,
   formatTrustZoneRef,
   INFRASTRUCTURE_TYPE,
@@ -120,11 +124,13 @@ export const appendEntityEdit = (spec: unknown, entity: JsonObject): SpecEdit =>
 export interface LocalReference {
   /** Document index of the entity writing the reference. */
   index: number;
-  /** Where the reference is written. */
+  /** Where the reference is written: a spec field or list entry, or the whole comma-separated annotation holding it. */
   path: SpecPath;
   field: string;
   position?: number;
   many: boolean;
+  /** Set when the reference is one entry of a comma-separated annotation (e.g. deployed on). */
+  annotation?: string;
   text: string;
 }
 
@@ -136,23 +142,55 @@ export function referencesTo(spec: unknown, index: number): LocalReference[] {
   return entitiesOf(spec).flatMap((info) =>
     refsOf(info)
       .filter((r) => refTarget(r.text, r.field, info.namespace) === key)
-      .map((r) => ({
-        index: info.index,
-        path: entityPath(info.index, ...refValuePath(r.field), ...(r.position === undefined ? [] : [r.position])),
-        field: r.field.field,
-        position: r.position,
-        many: r.field.many,
-        text: r.text,
-      })),
+      .map((r) => {
+        // An entry of a comma-separated annotation cannot be addressed on its own: the annotation is written as a whole.
+        const inAnnotation = r.field.many && r.field.annotation;
+        return {
+          index: info.index,
+          path: entityPath(info.index, ...refValuePath(r.field), ...(r.position === undefined || inAnnotation ? [] : [r.position])),
+          field: r.field.field,
+          position: r.position,
+          many: r.field.many,
+          ...(inAnnotation ? { annotation: r.field.annotation } : {}),
+          text: r.text,
+        };
+      }),
   );
+}
+
+/** Writes each comma-separated annotation holding some of `references` again, with `change` applied to those entries (undefined removes one). */
+function annotationReferenceEdits(spec: unknown, references: LocalReference[], change: (text: string) => string | undefined): SpecEdit[] {
+  const byAnnotation = new Map<string, LocalReference[]>();
+  for (const r of references) if (r.annotation) byAnnotation.set(`${r.index} ${r.annotation}`, [...(byAnnotation.get(`${r.index} ${r.annotation}`) ?? []), r]);
+  return [...byAnnotation.values()].flatMap((list) => {
+    const { index, annotation } = list[0];
+    const positions = new Set(list.map((r) => r.position));
+    const entries = annotationList(documentsOf(spec)[index], annotation!).flatMap((text, i) => (positions.has(i) ? (change(text) ?? []) : [text]));
+    return setAnnotationListEdits(spec, index, annotation!, entries);
+  });
 }
 
 /** Renames an entity and every reference to it in this file, keeping how each reference is written. */
 export function renameEntityEdits(spec: unknown, index: number, newName: string): SpecEdit[] {
-  const edits: SpecEdit[] = referencesTo(spec, index).map((r) => {
-    const ref = parseRef(r.text)!;
-    return { op: 'set', path: r.path, value: `${ref.kind ? `${ref.kind}:` : ''}${ref.namespace ? `${ref.namespace}/` : ''}${newName}` };
-  });
+  const target = entityAt(spec, index);
+  const renamed = (text: string) => {
+    const ref = parseRef(text)!;
+    return `${ref.kind ? `${ref.kind}:` : ''}${ref.namespace ? `${ref.namespace}/` : ''}${newName}`;
+  };
+  const references = referencesTo(spec, index);
+  const edits: SpecEdit[] = references.filter((r) => !r.annotation).map((r) => ({ op: 'set', path: r.path, value: renamed(r.text) }));
+  edits.push(...annotationReferenceEdits(spec, references, renamed));
+  // Relationships name the dependency they are about.
+  if (target?.name) {
+    const key = keyOf(target);
+    for (const info of entitiesOf(spec)) {
+      const field = refField(info.kind, 'dependsOn');
+      const entries = relationshipEntries(info.entity);
+      const about = (e: (typeof entries)[number]) => !!field && !!e.label && refTarget(e.text, field, info.namespace) === key;
+      if (!entries.some(about)) continue;
+      edits.push(...setAnnotationListEdits(spec, info.index, RELATIONSHIPS_ANNOTATION, entries.map((e) => (about(e) ? `${e.label} ${renamed(e.text)}` : e.written))));
+    }
+  }
   return [{ op: 'set', path: entityPath(index, 'metadata', 'name'), value: newName }, ...edits];
 }
 
@@ -170,7 +208,11 @@ export function deleteEntityEdits(spec: unknown, index: number): SpecEdit[] {
   const listEntries = referencesTo(spec, index)
     .filter((r) => r.many && r.index !== index)
     .sort((a, b) => a.index - b.index || a.field.localeCompare(b.field) || (b.position ?? 0) - (a.position ?? 0));
-  return [...listEntries.map((r): SpecEdit => ({ op: 'delete', path: r.path })), { op: 'delete', path: entityPath(index) }];
+  return [
+    ...listEntries.filter((r) => !r.annotation).map((r): SpecEdit => ({ op: 'delete', path: r.path })),
+    ...annotationReferenceEdits(spec, listEntries, () => undefined),
+    { op: 'delete', path: entityPath(index) },
+  ];
 }
 
 /** Adds a reference to a list field (`providesApis`, `dependsOn`, or a comma-separated annotation like `deployedOn`) unless it already points there. */
@@ -190,6 +232,50 @@ export function addRefEdits(spec: unknown, index: number, field: string, target:
   // Appending keeps the comments of the existing entries.
   if (Array.isArray(getIn(info.entity, ['spec', field]))) return [{ op: 'set', path: entityPath(index, 'spec', field, list.length), value: ref }];
   return [{ op: 'set', path: entityPath(index, 'spec', field), value: [ref] }];
+}
+
+/* Relationships ------------------------------------------------------------ */
+
+/**
+ * Writes what the entity of document `index` does with `target`, one of its dependencies. The
+ * default relationship ("runs in" a network, "uses" anything else), or nothing, removes the entry.
+ */
+export function setRelationshipEdits(spec: unknown, index: number, target: { kind: string; namespace: string; name: string; category: Category }, label: string): SpecEdit[] {
+  const info = entityAt(spec, index);
+  const field = info && refField(info.kind, 'dependsOn');
+  if (!info || !field) return [];
+  const key = keyOf(target);
+  const entries = relationshipEntries(info.entity);
+  const about = (e: (typeof entries)[number]) => refTarget(e.text, field, info.namespace) === key;
+  const clean = cleanRelationship(label);
+  const entry = clean && clean.toLowerCase() !== defaultRelationship(target) ? `${clean} ${formatRef(target, undefined, info.namespace)}` : undefined;
+  const position = entries.findIndex(about);
+  const next = entries.filter((e) => !about(e)).map((e) => e.written);
+  if (entry) next.splice(position < 0 ? next.length : position, 0, entry);
+  if (next.join(', ') === entries.map((e) => e.written).join(', ')) return [];
+  return setAnnotationListEdits(spec, index, RELATIONSHIPS_ANNOTATION, next);
+}
+
+/**
+ * A relationship follows its `dependsOn` entry: removes the relationships written for the
+ * dependencies an edit took away (unticked, deleted, placed elsewhere), from `before` to `after`.
+ */
+export function droppedRelationshipEdits(before: unknown, after: unknown): SpecEdit[] {
+  const dependencies = (info: EntityInfo) => {
+    const field = refField(info.kind, 'dependsOn');
+    return new Set(field ? stringList(getIn(info.entity, ['spec', 'dependsOn'])).map((text) => refTarget(text, field, info.namespace)) : []);
+  };
+  const previous = new Map(entitiesOf(before).map((info) => [keyOf(info), info]));
+  return entitiesOf(after).flatMap((info) => {
+    const was = previous.get(keyOf(info));
+    const field = refField(info.kind, 'dependsOn');
+    const entries = relationshipEntries(info.entity);
+    if (!was || !field || !entries.length) return [];
+    const now = dependencies(info);
+    const removed = [...dependencies(was)].filter((key) => key && !now.has(key));
+    const kept = entries.filter((e) => !removed.includes(refTarget(e.text, field, info.namespace)));
+    return kept.length === entries.length ? [] : setAnnotationListEdits(after, info.index, RELATIONSHIPS_ANNOTATION, kept.map((e) => e.written));
+  });
 }
 
 /* Annotations and spec files ----------------------------------------------- */
@@ -340,7 +426,7 @@ export function importNetworksEdits(spec: unknown, outline: ThreatModelOutline, 
   return edits;
 }
 
-/** Places an entity in the networks standing for the trust zone a threat model gives it. */
+/** Places an entity in the networks standing for the trust zone a threat model gives it (a network it only used, it now runs in). */
 export function placeLikeThreatModelEdits(spec: unknown, index: number, placement: Placement): SpecEdit[] {
   const info = entityAt(spec, index);
   const field = info && refField(info.kind, 'dependsOn');
@@ -349,7 +435,12 @@ export function placeLikeThreatModelEdits(spec: unknown, index: number, placemen
   const list = stringList(getIn(info.entity, ['spec', 'dependsOn'])).filter((text) => !wrong.has(refTarget(text, field, info.namespace) ?? ''));
   const has = (key: string) => list.some((text) => refTarget(text, field, info.namespace) === key);
   const next = [...list, ...placement.expected.filter((n) => !has(n.key)).map((n) => formatRef(n, undefined, info.namespace))];
-  return [{ op: 'set', path: entityPath(index, 'spec', 'dependsOn'), value: next }];
+  const entries = relationshipEntries(info.entity);
+  const kept = entries.filter((e) => !placement.expected.some((n) => n.key === refTarget(e.text, field, info.namespace)));
+  return [
+    { op: 'set', path: entityPath(index, 'spec', 'dependsOn'), value: next },
+    ...(kept.length < entries.length ? setAnnotationListEdits(spec, index, RELATIONSHIPS_ANNOTATION, kept.map((e) => e.written)) : []),
+  ];
 }
 
 /* Repositories ------------------------------------------------------------- */

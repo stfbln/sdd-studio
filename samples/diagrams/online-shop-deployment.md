@@ -17,7 +17,7 @@ flowchart LR
   network_private{{"Private network"}}
   site_aws_us_east_1{{"AWS us-east-1"}}
 
-  component_shop_api -->|uses| resource_orders_db
+  component_shop_api -->|reads and writes| resource_orders_db
   component_shop_api -.->|runs in| network_private
   component_shop_api -.->|runs on| platform_prod_eks_cluster
   resource_orders_db -.->|runs in| network_private

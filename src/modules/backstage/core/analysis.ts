@@ -33,8 +33,10 @@ import {
   placementsOf,
   PURL_ANNOTATION,
   refValuePath,
+  relationshipEntries,
   REPOSITORY_URL_ANNOTATION,
   splitList,
+  stringList,
   trustZoneRef,
 } from './model';
 
@@ -190,6 +192,16 @@ export function analyzeCatalog(spec: unknown, context?: CatalogContext): Catalog
           warning(`${field.label.toLowerCase()} "${text}" must point to ${field.targetCategories.map((c) => `a ${CATEGORIES[c].singular.toLowerCase()}`).join(' or ')}`);
         }
       }
+    }
+
+    // Relationships: each one names a dependency, with its kind as dependsOn writes it.
+    const dependsOn = refFieldsOf(kind, category).find((f) => f.field === 'dependsOn');
+    const dependencies = new Set(dependsOn ? stringList(getIn(doc, ['spec', 'dependsOn'])).map((text) => refTarget(text, dependsOn, namespace)) : []);
+    for (const entry of relationshipEntries(doc)) {
+      const ref = entry.label ? parseRef(entry.text) : undefined;
+      if (!ref) warning(`relationship "${entry.written}" must be written as the relationship then the dependency, e.g. "uses resource:internet"`);
+      else if (!ref.kind) warning(`relationship "${entry.written}" needs the kind of the dependency, e.g. "${entry.label} resource:${ref.name}"`);
+      else if (!dependsOn || !dependencies.has(refTarget(entry.text, dependsOn, namespace))) warning(`relationship "${entry.written}" is about ${entry.text}, which is not in its dependencies (dependsOn)`);
     }
 
     // Kind-specific values.

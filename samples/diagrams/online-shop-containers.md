@@ -17,7 +17,7 @@ flowchart LR
 
   component_shop_api -->|provides| api_petstore_api
   component_shop_api -->|provides| api_order_events
-  component_shop_api -->|uses| resource_orders_db
+  component_shop_api -->|reads and writes| resource_orders_db
   component_shop_api -->|uses| dataasset_card_data
   dataasset_card_data -->|uses| resource_orders_db
 

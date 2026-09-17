@@ -9,7 +9,22 @@
  * same wherever it is rendered.
  */
 import { slugify } from '../../../shared/naming';
-import { CATEGORIES, CODE, HIERARCHY, NETWORKS, ORGANIZATION, PARENT_FIELDS, parentRelation, resourceTypeOf, summaryLabel, type Category, type EntitySummary } from './model';
+import {
+  CATEGORIES,
+  CODE,
+  HIERARCHY,
+  NETWORKS,
+  ORGANIZATION,
+  PARENT_FIELDS,
+  parentRelation,
+  relationshipOf,
+  resourceTypeOf,
+  reverseRelationship,
+  runsIn,
+  summaryLabel,
+  type Category,
+  type EntitySummary,
+} from './model';
 
 export type LabelMode = 'name' | 'description';
 export type Direction = 'TB' | 'LR';
@@ -34,7 +49,7 @@ export interface RelationGroup {
 /** Relationships that can be drawn, as the picker offers them. */
 export const RELATION_GROUPS: RelationGroup[] = [
   { id: 'apis', label: 'APIs', hint: 'Which component provides each API, and which ones consume it.' },
-  { id: 'dependencies', label: 'Dependencies', hint: 'What a component or resource uses: other components, resources and data assets.' },
+  { id: 'dependencies', label: 'Dependencies', hint: 'What a component or resource uses, reads, calls…: other components, resources, data assets, and networks it uses without running in them.' },
   { id: 'deployment', label: 'Deployment', hint: 'Networks entities run in, platforms and infrastructure they are deployed on, and sites hosting those.' },
   { id: 'code', label: 'Code and artifacts', hint: 'Repositories holding the code, and what builds each artifact.' },
   { id: 'ownership', label: 'Ownership', hint: 'The group or user owning each entity.' },
@@ -108,9 +123,9 @@ const INIT = [
 const MAX_WIDTH = 30;
 const MAX_DESCRIPTION_LINES = 3;
 
-/** Mermaid reads `#code;` escapes, so characters that would end the label or start a tag are written that way. */
+/** Mermaid reads `#code;` escapes, so characters that would end the label (`"`, or `|` on an arrow) or start a tag are written that way. */
 export function escapeLabel(text: string): string {
-  return text.replace(/#/g, '#35;').replace(/&/g, '#amp;').replace(/</g, '#lt;').replace(/>/g, '#gt;').replace(/"/g, '#quot;');
+  return text.replace(/#/g, '#35;').replace(/&/g, '#amp;').replace(/</g, '#lt;').replace(/>/g, '#gt;').replace(/"/g, '#quot;').replace(/\|/g, '#124;');
 }
 
 /** Cuts a description into lines short enough to keep the box narrow, with an ellipsis when it is long. */
@@ -171,9 +186,12 @@ export const HIERARCHY_GROUPS = [AROUND_GROUP, INSIDE_GROUP];
 export interface Connection {
   /** Relation group, or `hierarchy` when the nesting shows it. */
   group: string;
-  /** What the entity writing the relationship does to the other one: "uses", "owned by"… */
+  /**
+   * What the entity writing the relationship does to the other one: "uses", "owned by"… Empty
+   * when it is the reverse of a relationship written in words of its own (no known reverse).
+   */
   forward: string;
-  /** The same relationship read the other way round: "used by", "owns"… */
+  /** The same relationship read the other way round: "used by", "owns"… Empty like `forward`. */
   backward: string;
   dashed?: boolean;
   /** The arrow goes from the target to the entity writing the relationship (it wrote the reverse). */
@@ -187,7 +205,8 @@ const isContainment = (entity: EntitySummary, field: string, target: EntitySumma
 /**
  * What a relationship written by `writer` about `target` says, read from either end, and which way
  * the arrow points. Both sides of a relationship (`dependsOn` / `dependencyOf`) read the same way,
- * so it is only drawn once.
+ * so it is only drawn once: the relationship written by the entity depending on the other one
+ * ("uses" the internet rather than "runs in" it) names both.
  */
 export function connectionOf(writer: EntitySummary, field: string, target: EntitySummary): Connection | undefined {
   if (isContainment(writer, field, target)) return { group: HIERARCHY_GROUP, forward: 'in', backward: 'contains' };
@@ -197,11 +216,16 @@ export function connectionOf(writer: EntitySummary, field: string, target: Entit
     case 'consumesApis':
       return { group: 'apis', forward: 'consumes', backward: 'consumed by' };
     case 'dependsOn':
-      return target.category === 'network' ? { group: 'deployment', forward: 'runs in', backward: 'hosts', dashed: true } : { group: 'dependencies', forward: 'uses', backward: 'used by' };
-    case 'dependencyOf':
-      return writer.category === 'network'
-        ? { group: 'deployment', forward: 'hosts', backward: 'runs in', dashed: true, inverted: true }
-        : { group: 'dependencies', forward: 'used by', backward: 'uses', inverted: true };
+    case 'dependencyOf': {
+      const inverted = field === 'dependencyOf';
+      const [dependent, dependency] = inverted ? [target, writer] : [writer, target];
+      const relation = dependent.relations.find((r) => r.field === 'dependsOn' && r.target === dependency.key) ?? { field: 'dependsOn', target: dependency.key };
+      const label = relationshipOf(relation, dependency);
+      const placed = runsIn(relation, dependency);
+      const group = placed ? { group: 'deployment', dashed: true } : { group: 'dependencies' };
+      const reverse = reverseRelationship(label);
+      return inverted ? { ...group, forward: reverse, backward: label, inverted } : { ...group, forward: label, backward: reverse };
+    }
     case 'deployedOn':
       return { group: 'deployment', forward: 'runs on', backward: 'hosts', dashed: true };
     case 'site':
@@ -309,6 +333,9 @@ export function relatedEntities(entities: EntitySummary[], focus: string[]): Rel
     found.set(entity.key, known);
   };
 
+  // A relationship with no known reverse is read from the focus instead: "Shop API fetches prices from it".
+  const phrase = (verb: string, reverse: string, label: string) => (verb ? `${verb} ${label}` : `${label} ${reverse} it`);
+
   for (const key of chosen) {
     const self = byKey.get(key)!;
     const label = summaryLabel(self);
@@ -318,14 +345,14 @@ export function relatedEntities(entities: EntitySummary[], focus: string[]): Rel
       const target = byKey.get(relation.target);
       if (!target || chosen.has(target.key)) continue;
       const connection = connectionOf(self, relation.field, target);
-      if (connection) add(target, connection.group === HIERARCHY_GROUP ? AROUND_GROUP : connection.group, `${connection.backward} ${label}`);
+      if (connection) add(target, connection.group === HIERARCHY_GROUP ? AROUND_GROUP : connection.group, phrase(connection.backward, connection.forward, label));
     }
     // What others say about the focus, read from them ("provides Petstore API", "in Online shop").
     for (const other of entities) {
       if (chosen.has(other.key)) continue;
       for (const relation of other.relations.filter((r) => r.target === key)) {
         const connection = connectionOf(other, relation.field, self);
-        if (connection) add(other, connection.group === HIERARCHY_GROUP ? INSIDE_GROUP : connection.group, `${connection.forward} ${label}`);
+        if (connection) add(other, connection.group === HIERARCHY_GROUP ? INSIDE_GROUP : connection.group, phrase(connection.forward, connection.backward, label));
       }
     }
   }
@@ -437,7 +464,7 @@ export function buildDiagram(entities: EntitySummary[], options: DiagramOptions)
     }
   }
   if (edges.length) lines.push('');
-  for (const edge of edges) lines.push(`  ${ids.get(edge.from)} ${edge.dashed ? '-.->' : '-->'}|${edge.label}| ${ids.get(edge.to)}`);
+  for (const edge of edges) lines.push(`  ${ids.get(edge.from)} ${edge.dashed ? '-.->' : '-->'}|${escapeLabel(edge.label)}| ${ids.get(edge.to)}`);
 
   // Colours: one class per category of plain box, one style per box holding other ones, and a
   // stronger outline for the entities the diagram is about.

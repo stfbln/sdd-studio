@@ -32,6 +32,7 @@ export const SITE_ANNOTATION = 'sdd-studio/site';
 export const DEPLOYED_ON_ANNOTATION = 'sdd-studio/deployed-on';
 export const CLOUD_PROVIDER_ANNOTATION = 'sdd-studio/cloud-provider';
 export const REGION_ANNOTATION = 'sdd-studio/region';
+export const RELATIONSHIPS_ANNOTATION = 'sdd-studio/relationships';
 /** Backstage's own annotation: where the source code of an entity is ("View source", TechDocs). */
 export const SOURCE_LOCATION_ANNOTATION = 'backstage.io/source-location';
 
@@ -155,14 +156,22 @@ export interface EntitySummary {
   definition?: string;
   specs: string[];
   threatModels: string[];
-  /** Reference fields, resolved to entity keys. */
-  relations: { field: string; target: string }[];
+  /** Reference fields, resolved to entity keys, with the relationship written for a `dependsOn` entry. */
+  relations: Relation[];
   /** Networks: the threat model trust zone they stand for. */
   trustZone?: { path: string; id: string };
   /** Repositories: where they are. */
   repository?: RepositoryInfo;
   /** Path of the code inside the linked repository. */
   repositoryPath?: string;
+}
+
+export interface Relation {
+  field: string;
+  /** Entity key. */
+  target: string;
+  /** What the entity does with a dependency, when written (see `RELATIONSHIPS_ANNOTATION`). */
+  label?: string;
 }
 
 /** Trust zones and components of an Open Threat Model file, to correlate networks with trust zones. */
@@ -433,6 +442,56 @@ export function refsOf(info: EntityInfo): { field: RefField; position?: number; 
   });
 }
 
+/* Relationships ------------------------------------------------------------ */
+
+/*
+ * What an entity does with what it depends on. Backstage's `dependsOn` only lists references, so
+ * when the default does not say it (an entity runs in a network and uses anything else), the
+ * relationship is written in the `sdd-studio/relationships` annotation of the entity depending on
+ * the other one, the relationship before the reference:
+ * `uses resource:internet, reads from resource:orders-db`.
+ */
+
+export const RUNS_IN = 'runs in';
+export const USES = 'uses';
+
+/** Relationships offered when linking, with how each one reads from the other end. */
+export const RELATIONSHIPS: { label: string; reverse: string }[] = [
+  { label: RUNS_IN, reverse: 'hosts' },
+  { label: USES, reverse: 'used by' },
+  { label: 'connects to', reverse: 'reached by' },
+  { label: 'calls', reverse: 'called by' },
+  { label: 'reads from', reverse: 'read by' },
+  { label: 'writes to', reverse: 'written to by' },
+  { label: 'reads and writes', reverse: 'read and written by' },
+  { label: 'publishes to', reverse: 'receives from' },
+  { label: 'subscribes to', reverse: 'delivers to' },
+  { label: 'deploys to', reverse: 'deployed by' },
+];
+
+export const defaultRelationship = (target: { category: Category }) => (target.category === 'network' ? RUNS_IN : USES);
+
+/** A relationship as it is written: single spaces, and no commas (they separate the entries). */
+export const cleanRelationship = (text: string) => text.replace(/[\s,]+/g, ' ').trim();
+
+/** How the other end reads a relationship ("used by"), or '' for one written in words of its own. */
+export const reverseRelationship = (label: string) => RELATIONSHIPS.find((r) => r.label === cleanRelationship(label).toLowerCase())?.reverse ?? '';
+
+/** Entries of the relationships annotation; `label` is empty when an entry has no reference after it. */
+export function relationshipEntries(entity: unknown): { label: string; text: string; written: string }[] {
+  return annotationList(entity, RELATIONSHIPS_ANNOTATION).map((written) => {
+    const match = /^(.*\S)\s+(\S+)$/.exec(written);
+    return match ? { label: cleanRelationship(match[1]), text: match[2], written } : { label: '', text: written, written };
+  });
+}
+
+/** What a relation says the entity does with `target`: the relationship written, else the default. */
+export const relationshipOf = (relation: { label?: string }, target: { category: Category }) => relation.label || defaultRelationship(target);
+
+/** Whether a relation places the entity in a network: it depends on it and runs in it, rather than using it. */
+export const runsIn = (relation: { field: string; label?: string }, target: { category: Category }) =>
+  relation.field === 'dependsOn' && target.category === 'network' && relationshipOf(relation, target).toLowerCase() === RUNS_IN;
+
 /* Paths -------------------------------------------------------------------- */
 
 /** Workspace path helpers, shared with the other modules. */
@@ -461,6 +520,7 @@ export function summarizeEntity(info: EntityInfo, file: string): EntitySummary {
   const annotation = (key: string) => str(getIn(info.entity, ['metadata', 'annotations', key])).trim();
   const zone = trustZoneRef(info.entity, dir);
   const repositoryPath = annotation(REPOSITORY_PATH_ANNOTATION);
+  const relationships = relationshipEntries(info.entity);
   return {
     key: keyOf(info),
     kind: info.kind,
@@ -474,9 +534,11 @@ export function summarizeEntity(info: EntityInfo, file: string): EntitySummary {
     ...(definition && resolvePath(dir, definition) ? { definition: resolvePath(dir, definition) } : {}),
     specs: resolveAll(annotationList(info.entity, SPECS_ANNOTATION)),
     threatModels: resolveAll(annotationList(info.entity, THREAT_MODELS_ANNOTATION)),
-    relations: refsOf(info).flatMap((r) => {
+    relations: refsOf(info).flatMap((r): Relation[] => {
       const target = refTarget(r.text, r.field, info.namespace);
-      return target ? [{ field: r.field.field, target }] : [];
+      if (!target) return [];
+      const label = r.field.field === 'dependsOn' ? relationships.find((e) => e.label && refTarget(e.text, r.field, info.namespace) === target)?.label : undefined;
+      return [{ field: r.field.field, target, ...(label ? { label } : {}) }];
     }),
     ...(zone?.path ? { trustZone: { path: zone.path, id: zone.id } } : {}),
     ...(info.category === 'repository'
@@ -541,9 +603,9 @@ export function ancestors(key: string, known: EntitySummary[]): EntitySummary[] 
   return result;
 }
 
-/** Entities pointing to `key`, with the field used. */
-export function incoming(key: string, known: KnownEntity[]): { entity: KnownEntity; field: string }[] {
-  return known.flatMap((entity) => entity.relations.filter((r) => r.target === key).map((r) => ({ entity, field: r.field })));
+/** Entities pointing to `key`, with the field used and the relationship written. */
+export function incoming(key: string, known: KnownEntity[]): { entity: KnownEntity; field: string; label?: string }[] {
+  return known.flatMap((entity) => entity.relations.filter((r) => r.target === key).map((r) => ({ entity, field: r.field, ...(r.label ? { label: r.label } : {}) })));
 }
 
 /** Threat models applying to an entity: its own, then those of its ancestors (system, domain...). */
@@ -580,9 +642,9 @@ export function trustZoneRef(entity: unknown, dir: string): { written: string; p
 
 export const formatTrustZoneRef = (dir: string, path: string, id: string) => `${relativePath(dir, path)}#${id}`;
 
-/** Networks an entity runs in (its `dependsOn` entries pointing to networks). */
+/** Networks an entity runs in: its `dependsOn` entries pointing to networks, except the ones it only uses or connects to. */
 export const networksOf = (summary: EntitySummary, known: EntitySummary[]): EntitySummary[] =>
-  summary.relations.flatMap((r) => (r.field === 'dependsOn' ? known.filter((e) => e.key === r.target && e.category === 'network') : []));
+  summary.relations.flatMap((r) => known.filter((e) => e.key === r.target && runsIn(r, e)));
 
 /** The component of a threat model standing for a catalog entity: same id as the name, or same name as the title. */
 export function matchThreatModelComponent(summary: EntitySummary, outline: ThreatModelOutline) {

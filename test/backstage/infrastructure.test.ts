@@ -2,9 +2,11 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { analyzeCatalog } from '../../src/modules/backstage/core/analysis';
+import { entityBrief } from '../../src/modules/backstage/core/brief';
 import {
   addRefEdits,
   deleteEntityEdits,
+  droppedRelationshipEdits,
   importNetworksEdits,
   newEntity,
   placeLikeThreatModelEdits,
@@ -12,6 +14,7 @@ import {
   renameEntityEdits,
   setAnnotationEdits,
   setParentNetworkEdits,
+  setRelationshipEdits,
   sourceLocationEdits,
   unlinkAnnotationEdits,
 } from '../../src/modules/backstage/core/edits';
@@ -44,10 +47,12 @@ const parse = (text: string) => {
 };
 const sample = () => parse(SAMPLE);
 
-/** Applies edits (plus the source locations they imply, as the form does) to the text. */
+/** Applies edits (plus the source locations and dropped relationships they imply, as the form does) to the text. */
 function apply(text: string, edits: SpecEdit[], context: CatalogContext = CONTEXT) {
   const before = parse(text);
-  const all = [...edits, ...sourceLocationEdits(before, applyEditsToValue(before, edits), context)];
+  const after = applyEditsToValue(before, edits);
+  const locations = sourceLocationEdits(before, after, context);
+  const all = [...edits, ...locations, ...droppedRelationshipEdits(before, applyEditsToValue(after, locations))];
   const written = applyYamlDocumentEdits(text, all);
   expect(parse(written)).toEqual(applyEditsToValue(before, all));
   return written;
@@ -270,6 +275,19 @@ describe('platforms, infrastructure and sites', () => {
     expect(refField('resource', 'site')?.reverse).toBe('Hosts');
   });
 
+  it('renames and deletes what an entity is deployed on, entries of a comma-separated annotation', () => {
+    const spec = sample();
+    let text = apply(SAMPLE, renameEntityEdits(spec, indexOf(spec, 'prod-eks-cluster'), 'eks'));
+    expect(docOf(text, 'shop-api')).toContain('    sdd-studio/deployed-on: eks\n');
+    expect(messages(parse(text))).toEqual([]);
+
+    const dbHost = knownEntities(parse(text), CONTEXT).find((e) => e.name === 'db-host')!;
+    text = apply(text, addRefEdits(parse(text), indexOf(parse(text), 'shop-api'), 'deployedOn', dbHost));
+    text = apply(text, deleteEntityEdits(parse(text), indexOf(parse(text), 'eks')));
+    expect(docOf(text, 'shop-api')).toContain('    sdd-studio/deployed-on: db-host\n');
+    expect(messages(parse(text))).toEqual([]);
+  });
+
   it('checks deployedOn and site references point to the right category', () => {
     const spec = sample();
     const text = apply(SAMPLE, [
@@ -279,6 +297,69 @@ describe('platforms, infrastructure and sites', () => {
     expect(messages(parse(text))).toEqual([
       'warning: Component Shop API: deployed on "orders-db" must point to a platform or a infrastructure',
       'warning: Platform Prod EKS cluster: site "shop-api-image" must point to a site',
+    ]);
+  });
+});
+
+describe('relationships', () => {
+  const named = (spec: unknown, name: string) => knownEntities(spec, CONTEXT).find((e) => e.name === name)!;
+  const runsIn = (text: string) => placementsOf('component:default/shop-api', knownEntities(parse(text), CONTEXT), CONTEXT)[0].actual.map((n) => n.name);
+
+  it('tells the networks an entity uses from the ones it runs in', () => {
+    const spec = sample();
+    const api = indexOf(spec, 'shop-api');
+    const internet = named(spec, 'internet');
+    let text = apply(SAMPLE, addRefEdits(spec, api, 'dependsOn', internet));
+    expect(runsIn(text)).toEqual(['private', 'internet']);
+
+    // Shop API reaches the internet, it does not run there.
+    text = apply(text, setRelationshipEdits(parse(text), api, internet, 'uses'));
+    expect(docOf(text, 'shop-api')).toContain('    sdd-studio/relationships: uses resource:internet\n');
+    expect(runsIn(text)).toEqual(['private']);
+    expect(entityBrief(parse(text), api, CONTEXT)!.networks.map((n) => n.name)).toEqual(['private']);
+    expect(incoming('resource:default/internet', knownEntities(parse(text), CONTEXT)).find((r) => r.entity.name === 'shop-api')).toMatchObject({ field: 'dependsOn', label: 'uses' });
+    expect(messages(parse(text))).toEqual([]);
+
+    // Words of its own are tidied up; the default relationship is not written.
+    text = apply(text, setRelationshipEdits(parse(text), api, internet, ' connects ,to '));
+    expect(docOf(text, 'shop-api')).toContain('    sdd-studio/relationships: connects to resource:internet\n');
+    text = apply(text, setRelationshipEdits(parse(text), api, internet, 'Runs in'));
+    expect(docOf(text, 'shop-api')).not.toContain('sdd-studio/relationships');
+    expect(runsIn(text)).toEqual(['private', 'internet']);
+  });
+
+  it('keeps a relationship with its dependency: renamed, removed or placed like the threat model', () => {
+    const spec = sample();
+    const api = indexOf(spec, 'shop-api');
+    let text = apply(SAMPLE, setRelationshipEdits(spec, api, named(spec, 'orders-db'), 'reads and writes'));
+    expect(docOf(text, 'shop-api')).toContain('    sdd-studio/relationships: reads and writes resource:orders-db\n');
+
+    text = apply(text, renameEntityEdits(parse(text), indexOf(parse(text), 'orders-db'), 'orders'));
+    expect(docOf(text, 'shop-api')).toContain('    sdd-studio/relationships: reads and writes resource:orders\n');
+    expect(messages(parse(text))).toEqual([]);
+
+    // Unticking the dependency, or deleting the entity, takes the relationship away.
+    expect(docOf(apply(text, [{ op: 'delete', path: ['documents', api, 'spec', 'dependsOn', 0] }]), 'shop-api')).not.toContain('sdd-studio/relationships');
+    const deleted = apply(text, deleteEntityEdits(parse(text), indexOf(parse(text), 'orders')));
+    expect(docOf(deleted, 'shop-api')).not.toContain('sdd-studio/relationships');
+    expect(messages(parse(deleted))).toEqual([]);
+
+    // Only using the network of its trust zone: placing it like the threat model makes it run there.
+    text = apply(SAMPLE, setRelationshipEdits(spec, api, named(spec, 'private'), 'uses'));
+    const [placement] = placementsOf('component:default/shop-api', knownEntities(parse(text), CONTEXT), CONTEXT);
+    expect([placement.actual, placement.expected.map((n) => n.name)]).toEqual([[], ['private']]);
+    text = apply(text, placeLikeThreatModelEdits(parse(text), api, placement));
+    expect(docOf(text, 'shop-api')).not.toContain('sdd-studio/relationships');
+    expect(runsIn(text)).toEqual(['private']);
+  });
+
+  it('checks each relationship names a dependency', () => {
+    const spec = sample();
+    const text = apply(SAMPLE, setAnnotationEdits(spec, indexOf(spec, 'shop-api'), 'sdd-studio/relationships', 'internet, uses internet, calls component:deploy-cli, reads from resource:orders-db'));
+    expect(messages(parse(text))).toEqual([
+      'warning: Component Shop API: relationship "internet" must be written as the relationship then the dependency, e.g. "uses resource:internet"',
+      'warning: Component Shop API: relationship "uses internet" needs the kind of the dependency, e.g. "uses resource:internet"',
+      'warning: Component Shop API: relationship "calls component:deploy-cli" is about component:deploy-cli, which is not in its dependencies (dependsOn)',
     ]);
   });
 });

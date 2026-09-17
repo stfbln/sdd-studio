@@ -143,6 +143,38 @@ describe('arrows', () => {
     expect(text).toContain('component_shop_api -.->|builds| artifact_shop_api_image');
   });
 
+  it('labels a dependency with the relationship written, and only draws running in a network as deployment', () => {
+    const entities = catalog(
+      entity(
+        'Component',
+        'web',
+        '  owner: team\n  dependsOn: [resource:internet, resource:private, resource:orders-db, resource:prices]\n',
+        '  annotations:\n    sdd-studio/relationships: uses resource:internet, reads | writes resource:orders-db, fetches prices from resource:prices\n',
+      ),
+      entity('Resource', 'internet', '  type: network\n  owner: team\n'),
+      entity('Resource', 'private', '  type: network\n  owner: team\n'),
+      // The database also says it is a dependency of web: still one arrow, named by web.
+      entity('Resource', 'orders-db', '  type: database\n  owner: team\n  dependencyOf: [component:web]\n'),
+      entity('Resource', 'prices', '  type: external-service\n  owner: team\n'),
+    );
+    expect(body(all(entities, { relations: ['dependencies', 'deployment'] }).text).filter((l) => l.includes('->'))).toEqual([
+      'component_web -->|uses| network_internet',
+      'component_web -.->|runs in| network_private',
+      'component_web -->|reads #124; writes| resource_orders_db',
+      'component_web -->|fetches prices from| resource_prices',
+    ]);
+    expect(all(entities, { relations: ['deployment'] }).arrows).toBe(1);
+
+    // Read from the other end, with the reverse when it is known.
+    const at = (focus: string, name: string) => relatedEntities(entities, [entities.find((e) => e.name === focus)!.key]).find((r) => r.entity.name === name);
+    expect(at('web', 'internet')).toMatchObject({ groups: ['dependencies'], connections: ['used by web'] });
+    expect(at('web', 'private')).toMatchObject({ groups: ['deployment'], connections: ['hosts web'] });
+    expect(at('internet', 'web')!.connections).toEqual(['uses internet']);
+    expect(at('orders-db', 'web')!.connections).toEqual(['reads | writes orders-db']);
+    expect(at('web', 'orders-db')!.connections).toEqual(['web reads | writes it']);
+    expect(at('web', 'prices')!.connections).toEqual(['web fetches prices from it']);
+  });
+
   it('never draws an arrow between a box and the box holding it', () => {
     const entities = catalog(
       entity('System', 'shop', '  owner: team\n'),
@@ -174,7 +206,7 @@ describe('labels', () => {
   });
 
   it('escapes what would end the label or start a tag', () => {
-    expect(escapeLabel('a "b" <c> & #d')).toBe('a #quot;b#quot; #lt;c#gt; #amp; #35;d');
+    expect(escapeLabel('a "b" <c> & #d | e')).toBe('a #quot;b#quot; #lt;c#gt; #amp; #35;d #124; e');
   });
 
   it('wraps long text and cuts it off after three lines', () => {

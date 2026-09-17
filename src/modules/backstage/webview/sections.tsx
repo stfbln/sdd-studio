@@ -1,15 +1,16 @@
-import { useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { getIn, isObject, type JsonObject, type SpecEdit } from '../../../shared/structured/edits';
 import { AutoTextarea } from '../../../webview/components/AutoTextarea';
 import { IconButton } from '../../../webview/components/IconButton';
 import { Section } from '../../../webview/structured/fields';
 import { creatableSpecKinds, entityBrief, newSpecFileRequest, suggestedTitle, trustZoneLinkEdits, type NewSpecFileRequest } from '../core/brief';
-import { addRefEdits, appendEntityEdit, linkSpecFileEdits, newEntity, setDefinitionEdits, unlinkAnnotationEdits } from '../core/edits';
+import { addRefEdits, appendEntityEdit, linkSpecFileEdits, newEntity, setDefinitionEdits, setRelationshipEdits, unlinkAnnotationEdits } from '../core/edits';
 import {
   annotationList,
   ARTIFACT_TYPE_ANNOTATION,
   CATEGORIES,
   CLASSIFICATION_LABEL,
+  defaultRelationship,
   definitionRef,
   dirOf,
   dirOfDocument,
@@ -22,6 +23,10 @@ import {
   refField,
   refFieldsOf,
   refTarget,
+  relationshipEntries,
+  relationshipOf,
+  RELATIONSHIPS,
+  RELATIONSHIPS_ANNOTATION,
   resolvePath,
   SPEC_FILE_KINDS,
   SPECS_ANNOTATION,
@@ -426,6 +431,8 @@ export function ContentsSection({ index }: { index: number }) {
   );
 }
 
+const sentence = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
 /** Entities pointing to this one (owners, consumers, users...), except those listed in its contents. */
 export function RelationsSection({ index }: { index: number }) {
   const { spec } = useCatalog();
@@ -440,8 +447,13 @@ export function RelationsSection({ index }: { index: number }) {
   if (info.category === 'site') for (const r of incoming(keyOf(info), known)) if (r.field === 'site') shown.add(`${r.entity.key} ${r.field}`);
   const relations = info.name ? incoming(keyOf(info), known).filter((r) => !shown.has(`${r.entity.key} ${r.field}`) && r.entity.key !== keyOf(info)) : [];
   const groups = new Map<string, KnownEntity[]>();
-  for (const { entity, field } of relations) {
-    const label = field === 'dependsOn' && info.category === 'network' ? 'Runs in this network' : (refFieldsOf(entity.kind, entity.category).find((f) => f.field === field)?.reverse ?? field);
+  for (const { entity, field, label: relationship } of relations) {
+    // A dependency says what is done with it: "Runs in this network", "Reads from this resource".
+    const custom = !!relationship && relationship.toLowerCase() !== defaultRelationship(info);
+    const label =
+      field === 'dependsOn' && (custom || info.category === 'network')
+        ? `${sentence(relationshipOf({ label: relationship }, info))} this ${CATEGORIES[info.category].singular.toLowerCase()}`
+        : (refFieldsOf(entity.kind, entity.category).find((f) => f.field === field)?.reverse ?? field);
     groups.set(label, [...(groups.get(label) ?? []), entity]);
   }
   if (!groups.size) return null;
@@ -458,6 +470,45 @@ export function RelationsSection({ index }: { index: number }) {
         </div>
       ))}
     </Section>
+  );
+}
+
+/**
+ * What the entity of document `index` does with `target`, one of its dependencies: picked from the
+ * usual relationships or typed. Empty means the default ("runs in" a network, "uses" anything else).
+ */
+export function RelationshipInput({ index, target }: { index: number; target: KnownEntity }) {
+  const { spec, edit } = useCatalog();
+  const listId = useId();
+  // What is typed stays as it is while the field has focus: the file keeps the relationship tidied up.
+  const [draft, setDraft] = useState<string>();
+  const info = entityAt(spec, index)!;
+  const field = refField(info.kind, 'dependsOn')!;
+  const written = relationshipEntries(info.entity).find((e) => e.label && refTarget(e.text, field, info.namespace) === target.key)?.label ?? '';
+  const fallback = defaultRelationship(target);
+  return (
+    <>
+      <input
+        className="input input-small relationship-input"
+        list={listId}
+        value={draft ?? written}
+        placeholder={fallback}
+        aria-label={`Relationship to ${summaryLabel(target)}`}
+        title={`What it does with ${summaryLabel(target)}: runs in, uses, reads from, calls… Empty means “${fallback}”.`}
+        spellCheck={false}
+        onChange={(e) => {
+          setDraft(e.target.value);
+          const edits = setRelationshipEdits(spec, index, target, e.target.value);
+          if (edits.length) edit(edits);
+        }}
+        onBlur={() => setDraft(undefined)}
+      />
+      <datalist id={listId}>
+        {RELATIONSHIPS.map((r) => (
+          <option key={r.label} value={r.label} />
+        ))}
+      </datalist>
+    </>
   );
 }
 
@@ -520,6 +571,7 @@ export function DependsOnChecklist({ index, category, children }: { index: numbe
           <input type="checkbox" aria-label={`${texts.verb} ${summaryLabel(target)}`} checked={usedKeys.has(target.key)} onChange={(e) => toggle(target, e.target.checked)} />
           <EntityLink entity={target} />
           <EntityBadge entity={target} />
+          {usedKeys.has(target.key) && <RelationshipInput index={index} target={target} />}
         </div>
       ))}
       {children}
@@ -535,7 +587,8 @@ export function DependsOnChecklist({ index, category, children }: { index: numbe
           }}
         />
         <span className="muted small">
-          Written as <code>resource:name</code> entries of dependsOn.
+          Written as <code>resource:name</code> entries of dependsOn; a relationship other than “{defaultRelationship({ category })}” goes to{' '}
+          <code>{RELATIONSHIPS_ANNOTATION}</code>.
         </span>
       </div>
     </Section>

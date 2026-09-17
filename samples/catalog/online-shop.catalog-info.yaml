@@ -28,6 +28,10 @@
 #     sdd-studio/provider, sdd-studio/repository-url and sdd-studio/default-branch. Keep
 #     backstage.io/source-location in line with them (url:<repository URL>/tree/<branch>/<path>,
 #     /-/tree/ on GitLab).
+#   - Relationships: sdd-studio/relationships on components and resources says what they do with a
+#     dependency when it is not "runs in" (a network) or "uses" (anything else), as the relationship
+#     then the dependsOn entry: "uses resource:internet, reads from resource:orders-db". Only the
+#     networks an entity runs in place it in their trust zone.
 #   - Deployment: sdd-studio/deployed-on on components and resources (comma-separated entity
 #     references) points to Resources of type platform or infrastructure they run on.
 #     sdd-studio/site on networks, platforms and infrastructure points to a Resource of type site (a
@@ -71,6 +75,7 @@ metadata:
     sdd-studio/repository: shop-repo
     sdd-studio/repository-path: services/shop-api
     sdd-studio/deployed-on: prod-eks-cluster
+    sdd-studio/relationships: reads and writes resource:orders-db
     backstage.io/source-location: url:https://gitlab.com/acme/shop/-/tree/main/services/shop-api/
 spec:
   type: service
