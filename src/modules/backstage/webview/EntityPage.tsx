@@ -29,7 +29,6 @@ import {
   keyOf,
   LIFECYCLES,
   refField,
-  refTarget,
   RELATIONSHIPS_ANNOTATION,
   relativePath,
   resolvePath,
@@ -52,9 +51,9 @@ import {
   type Category,
   type EntityInfo,
 } from '../core/model';
-import { EntityLink, KeyValueSection, LinksSection, NameField, RefInput, RefListField } from './controls';
+import { KeyValueSection, LinksSection, NameField, RefInput, RefListField } from './controls';
 import { ArtifactSections, CodeSection, DeployedHereSection, DeployedOnSection, NetworkSections, PlacementNotes, RepositorySections, SiteField, SiteSections } from './infrastructure';
-import { ContentsSection, CoverageTable, DependsOnChecklist, DefinitionSection, describeImpact, RelationshipInput, RelationsSection, SpecificationsSection, ThreatModelsSection } from './sections';
+import { ContentsSection, CoverageTable, DependenciesSection, DependsOnChecklist, DefinitionSection, describeImpact, RelationsSection, SpecificationsSection, ThreatModelsSection } from './sections';
 import { entityLocation, sameLocation, useCatalog, useField, useWorkspace } from './state';
 
 const RESOURCE_TYPE_OF: Partial<Record<Category, string>> = {
@@ -279,39 +278,11 @@ function ComponentPage({ info }: { info: EntityInfo }) {
       </DependsOnChecklist>
       <DependsOnChecklist index={info.index} category="dataAsset" />
       <DependsOnChecklist index={info.index} category="artifact" />
-      <DependenciesSection info={info} />
+      <DependenciesSection index={info.index} />
       <ContentsSection index={info.index} />
       <RelationsSection index={info.index} />
       <Metadata info={info} hiddenAnnotations={[RELATIONSHIPS_ANNOTATION]} />
     </>
-  );
-}
-
-/** Categories whose checklist says what is done with them, next to the checkbox. */
-const CHECKLIST_CATEGORIES: Category[] = ['network', 'dataAsset', 'artifact'];
-
-function DependenciesSection({ info }: { info: EntityInfo }) {
-  const { known } = useWorkspace();
-  const field = refField(info.kind, 'dependsOn')!;
-  const keys = new Set(stringList(getIn(info.entity, ['spec', 'dependsOn'])).map((text) => refTarget(text, field, info.namespace)));
-  const dependencies = known.filter((e, i, all) => keys.has(e.key) && !CHECKLIST_CATEGORIES.includes(e.category) && all.findIndex((o) => o.key === e.key) === i);
-  return (
-    <Section title="Dependencies" icon="link">
-      <div className="form-grid">
-        <RefListField index={info.index} field={field} placeholder="component:name or resource:name" />
-        <RefListField index={info.index} field={refField(info.kind, 'dependencyOf')!} placeholder="component:name or resource:name" />
-      </div>
-      {dependencies.length > 0 && (
-        <Field label="Relationships" hint={<>What it does with each dependency; empty means “uses”. Written in {RELATIONSHIPS_ANNOTATION}.</>}>
-          {dependencies.map((target) => (
-            <div key={target.key} className="list-row">
-              <EntityLink entity={target} showKind />
-              <RelationshipInput index={info.index} target={target} />
-            </div>
-          ))}
-        </Field>
-      )}
-    </Section>
   );
 }
 
@@ -348,7 +319,7 @@ function ResourcePage({ info }: { info: EntityInfo }) {
       <DependsOnChecklist index={info.index} category="artifact" />
       <CodeSection info={info} />
       <DeployedOnSection info={info} />
-      <DependenciesSection info={info} />
+      <DependenciesSection index={info.index} />
       <SpecificationsSection index={info.index} />
       <ThreatModelsSection index={info.index} />
       <RelationsSection index={info.index} />
@@ -469,7 +440,7 @@ function PlatformOrInfrastructurePage({ info }: { info: EntityInfo }) {
       <DependsOnChecklist index={info.index} category="dataAsset" />
       <DependsOnChecklist index={info.index} category="artifact" />
       <CodeSection info={info} />
-      <DependenciesSection info={info} />
+      <DependenciesSection index={info.index} />
       <SpecificationsSection index={info.index} />
       <ThreatModelsSection index={info.index} />
       <RelationsSection index={info.index} />

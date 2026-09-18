@@ -42,7 +42,7 @@ import {
   type SpecFileInfo,
   type SpecFileKind,
 } from '../core/model';
-import { CreateButton, EntityLink, NamePrompt, plural } from './controls';
+import { CreateButton, EntityLink, NamePrompt, plural, refStatus, RefListField } from './controls';
 import { entityLocation, useCatalog, useWorkspace } from './state';
 
 const baseName = (path: string) => path.slice(path.lastIndexOf('/') + 1);
@@ -542,6 +542,38 @@ function EntityBadge({ entity }: { entity: KnownEntity }) {
   return null;
 }
 
+interface DependencyEntry {
+  text: string;
+  /** Position in the `dependsOn` list. */
+  position: number;
+  /** Entity key it leads to, undefined when it is not a valid reference. */
+  key?: string;
+}
+
+/** `dependsOn` entries of an entity. */
+function dependencyEntries(info: EntityInfo): DependencyEntry[] {
+  const field = refField(info.kind, 'dependsOn')!;
+  const value = getIn(info.entity, ['spec', 'dependsOn']);
+  return (Array.isArray(value) ? value : []).map((v, position) => ({ text: str(v), position, key: refTarget(str(v), field, info.namespace) }));
+}
+
+/** Removes the `dependsOn` entries matching `remove`, and the list when none is left. */
+function removeDependencyEdits(info: EntityInfo, remove: (entry: DependencyEntry) => boolean): SpecEdit[] {
+  const entries = dependencyEntries(info);
+  const path = entityPath(info.index, 'spec', 'dependsOn');
+  const positions = entries.filter(remove).map((e) => e.position);
+  if (!positions.length) return [];
+  if (positions.length === entries.length) return [{ op: 'delete', path }];
+  return positions.reverse().map((i): SpecEdit => ({ op: 'delete', path: [...path, i] }));
+}
+
+/** Ticks or unticks a dependency of the entity of document `index`. */
+function useDependencyToggle(index: number) {
+  const { spec, edit } = useCatalog();
+  const info = entityAt(spec, index)!;
+  return (target: KnownEntity, on: boolean) => edit(on ? addRefEdits(spec, index, 'dependsOn', target) : removeDependencyEdits(info, (e) => e.key === target.key));
+}
+
 /** Data assets, networks or artifacts an entity uses, as `resource:name` entries of `dependsOn`. */
 export function DependsOnChecklist({ index, category, children }: { index: number; category: 'dataAsset' | 'network' | 'artifact'; children?: React.ReactNode }) {
   const { spec, edit, navigate } = useCatalog();
@@ -549,17 +581,9 @@ export function DependsOnChecklist({ index, category, children }: { index: numbe
   const info = entityAt(spec, index)!;
   const texts = CHECKLISTS[category]!;
   const singular = CATEGORIES[category].singular;
-  const field = refField(info.kind, 'dependsOn')!;
-  const path = entityPath(index, 'spec', 'dependsOn');
-  const list = stringList(getIn(info.entity, ['spec', 'dependsOn']));
   const candidates = known.filter((e) => e.category === category && e.key !== keyOf(info));
-  const usedKeys = new Set(list.map((text) => refTarget(text, field, info.namespace)));
-  const toggle = (target: KnownEntity, on: boolean) => {
-    if (on) return edit(addRefEdits(spec, index, 'dependsOn', target));
-    const positions = list.map((text, i) => (refTarget(text, field, info.namespace) === target.key ? i : -1)).filter((i) => i >= 0);
-    if (positions.length === list.length) return edit({ op: 'delete', path });
-    edit(positions.reverse().map((i): SpecEdit => ({ op: 'delete', path: [...path, i] })));
-  };
+  const usedKeys = new Set(dependencyEntries(info).map((e) => e.key));
+  const toggle = useDependencyToggle(index);
   const system = str(getIn(info.entity, ['spec', 'system']));
   const count = candidates.filter((a) => usedKeys.has(a.key)).length;
 
@@ -590,6 +614,74 @@ export function DependsOnChecklist({ index, category, children }: { index: numbe
           Written as <code>resource:name</code> entries of dependsOn; a relationship other than “{defaultRelationship({ category })}” goes to{' '}
           <code>{RELATIONSHIPS_ANNOTATION}</code>.
         </span>
+      </div>
+    </Section>
+  );
+}
+
+/** Categories with a checklist of their own: the dependencies section leaves them out. */
+const CHECKLIST_CATEGORIES: Category[] = ['network', 'dataAsset', 'artifact'];
+/** Categories offered as new dependencies. Other resources (platforms, repositories...) have fields of their own, and are only listed once depended on. */
+const DEPENDENCY_CATEGORIES = ['component', 'resource'] as const;
+
+/** Components and resources an entity depends on, ticked in a list like data assets and networks. */
+export function DependenciesSection({ index }: { index: number }) {
+  const { spec, edit, navigate } = useCatalog();
+  const { known, context } = useWorkspace();
+  const info = entityAt(spec, index)!;
+  const field = refField(info.kind, 'dependsOn')!;
+  const entries = dependencyEntries(info).filter((e) => e.text);
+  const usedKeys = new Set(entries.map((e) => e.key));
+  const self = keyOf(info);
+  const candidates = known.filter(
+    (e, i, all) =>
+      e.key !== self &&
+      e.name &&
+      all.findIndex((o) => o.key === e.key) === i &&
+      ((DEPENDENCY_CATEGORIES as readonly Category[]).includes(e.category) || (usedKeys.has(e.key) && !CHECKLIST_CATEGORIES.includes(e.category))),
+  );
+  // Entries leading to no entity of the workspace stay listed, so they can be unticked.
+  const unknown = context ? entries.filter((e) => !known.some((k) => k.key === e.key)) : [];
+  const toggle = useDependencyToggle(index);
+  const system = str(getIn(info.entity, ['spec', 'system']));
+  const singular = CATEGORIES[info.category].singular.toLowerCase();
+  const count = candidates.filter((c) => usedKeys.has(c.key)).length + unknown.length;
+  const create = (category: (typeof DEPENDENCY_CATEGORIES)[number], name: string) => {
+    const created = newEntity(spec, category, name, { namespace: info.namespace, spec: system ? { system } : {} }, context);
+    const target = { kind: CATEGORIES[category].kind, namespace: info.namespace, name: str((created.metadata as JsonObject).name) };
+    edit([appendEntityEdit(spec, created), ...addRefEdits(spec, index, 'dependsOn', target)]);
+    navigate(entityLocation(documentsOf(spec).length));
+  };
+
+  return (
+    <Section title="Dependencies" icon="link" count={count}>
+      {candidates.length + unknown.length === 0 && <p className="muted">No components or resources in the catalog yet: services, databases, queues or external services this {singular} depends on.</p>}
+      {candidates.map((target) => (
+        <div key={target.key} className="list-row">
+          <input type="checkbox" aria-label={`Depends on ${summaryLabel(target)}`} checked={usedKeys.has(target.key)} onChange={(e) => toggle(target, e.target.checked)} />
+          <EntityLink entity={target} showKind />
+          {target.category === 'resource' && target.type && <span className="muted small mono">{target.type}</span>}
+          {usedKeys.has(target.key) && <RelationshipInput index={index} target={target} />}
+        </div>
+      ))}
+      {unknown.map(({ text, position }) => (
+        <div key={`unknown-${position}`} className="list-row">
+          <input type="checkbox" aria-label={`Depends on ${text}`} checked onChange={() => edit(removeDependencyEdits(info, (e) => e.position === position))} />
+          <span className="warning-text mono">{text}</span>
+          <span className="muted small">{refStatus(text, field, info, known, true).problem ?? 'Not defined in the catalog files of the workspace'}</span>
+        </div>
+      ))}
+      {!context && <p className="muted small">Looking at the workspace…</p>}
+      <div className="list-row">
+        {DEPENDENCY_CATEGORIES.map((category) => (
+          <CreateButton key={category} label={`New ${lowerLabel(CATEGORIES[category].singular)}`} singular={lowerLabel(CATEGORIES[category].singular)} onCreate={(name) => create(category, name)} />
+        ))}
+        <span className="muted small">
+          Written as <code>component:name</code> or <code>resource:name</code> entries of dependsOn; a relationship other than “uses” goes to <code>{RELATIONSHIPS_ANNOTATION}</code>.
+        </span>
+      </div>
+      <div className="form-grid">
+        <RefListField index={index} field={refField(info.kind, 'dependencyOf')!} placeholder="component:name or resource:name" />
       </div>
     </Section>
   );

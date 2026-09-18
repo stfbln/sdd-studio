@@ -1,6 +1,7 @@
 import { useId, useState, type ReactNode } from 'react';
 import { getIn, isObject, type SpecPath } from '../../../shared/structured/edits';
 import { ChipsInput } from '../../../webview/components/ChipsInput';
+import { Combobox } from '../../../webview/components/Combobox';
 import { IconButton } from '../../../webview/components/IconButton';
 import { Field, KeyInput, Section } from '../../../webview/structured/fields';
 import { referencesTo, renameEntityEdits, setAnnotationEdits } from '../core/edits';
@@ -50,7 +51,7 @@ export function EntityLink({ entity, showKind }: { entity: KnownEntity; showKind
 }
 
 /** Where a reference leads: an entity, or why it leads nowhere. */
-function refStatus(text: string, field: RefField, info: EntityInfo, known: KnownEntity[], checked: boolean): { entity?: KnownEntity; problem?: string } {
+export function refStatus(text: string, field: RefField, info: EntityInfo, known: KnownEntity[], checked: boolean): { entity?: KnownEntity; problem?: string } {
   if (!text.trim()) return {};
   const ref = parseRef(text);
   if (!ref) return { problem: 'Not an entity reference: [kind:][namespace/]name' };
@@ -75,12 +76,16 @@ function candidatesFor(field: RefField, info: EntityInfo, known: KnownEntity[]) 
 export function RefInput({ index, field, hint }: { index: number; field: RefField; hint?: string }) {
   const { spec, edit } = useCatalog();
   const { known, context } = useWorkspace();
-  const listId = useId();
   const info = entityAt(spec, index)!;
   const [value, setSpec] = useField(entityPath(index, ...refValuePath(field)), { keepEmpty: field.required });
   const set = (next: string) => (field.annotation ? edit(setAnnotationEdits(spec, index, field.annotation, next)) : setSpec(next));
   const text = str(value);
-  const candidates = candidatesFor(field, info, known);
+  const candidates = candidatesFor(field, info, known).filter((c, i, all) => all.findIndex((o) => o.entity.key === c.entity.key) === i);
+  const options = candidates.map(({ ref, entity }) => {
+    const label = summaryLabel(entity);
+    const singular = CATEGORIES[entity.category].singular;
+    return { value: ref, label, detail: label === ref ? singular : `${singular} · ${ref}` };
+  });
   const status = refStatus(text, field, info, known, !!context);
   return (
     <Field
@@ -96,21 +101,14 @@ export function RefInput({ index, field, hint }: { index: number; field: RefFiel
         )
       }
     >
-      <input
-        className={`input mono ${(field.required && !text.trim()) || status.problem ? 'invalid' : ''}`}
-        list={listId}
+      <Combobox
+        className={`mono ${(field.required && !text.trim()) || status.problem ? 'invalid' : ''}`}
         value={text}
+        options={options}
         placeholder={field.allowed.length > 1 ? `${field.allowed.join(' or ')} name` : `${field.allowed[0]} name`}
-        spellCheck={false}
-        onChange={(e) => set(e.target.value)}
+        empty={options.length ? 'No match' : `No ${field.allowed.join(' or ')} in the catalog files yet`}
+        onChange={set}
       />
-      <datalist id={listId}>
-        {candidates.map((c) => (
-          <option key={c.entity.key} value={c.ref}>
-            {summaryLabel(c.entity)} ({CATEGORIES[c.entity.category].singular})
-          </option>
-        ))}
-      </datalist>
     </Field>
   );
 }

@@ -383,3 +383,41 @@ code,
   color: var(--vscode-editorSuggestWidget-selectedForeground, inherit);
   background: var(--vscode-editorSuggestWidget-selectedBackground, var(--vscode-list-activeSelectionBackground));
 }
+
+/* Combobox: the toggle sits inside the input, the list scrolls. */
+
+.combobox > .input {
+  padding-right: 22px;
+}
+
+.combobox-toggle {
+  position: absolute;
+  top: 50%;
+  right: 1px;
+  transform: translateY(-50%);
+  padding: 1px;
+  color: var(--sdd-muted);
+}
+
+.combobox-options {
+  max-height: 16em;
+  overflow-y: auto;
+}
+
+.suggestions li.current {
+  font-weight: 600;
+}
+
+.combobox-detail {
+  margin-left: 8px;
+  font-size: 0.9em;
+  font-weight: normal;
+  opacity: 0.75;
+}
+
+.suggestions li.combobox-empty,
+.suggestions li.combobox-empty:hover {
+  color: var(--sdd-muted);
+  background: none;
+  cursor: default;
+}
